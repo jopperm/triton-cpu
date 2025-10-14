@@ -472,6 +472,12 @@ class JitFunctionInfo:
     jit_function: JITFunction
 
 
+def get_device_key():
+    target = driver.active.get_current_target()
+    device = driver.active.get_current_device()
+    return f"{target.backend}:{device}"
+
+
 class JITFunction(KernelInterface[T]):
 
     def is_gluon(self):
@@ -548,6 +554,7 @@ class JITFunction(KernelInterface[T]):
         kwargs["debug"] = kwargs.get("debug", self.debug) or knobs.runtime.debug
 
         # parse options
+        device_key = get_device_key()
         device = driver.active.get_current_device()
         stream = driver.active.get_current_stream(device)
 
@@ -555,7 +562,7 @@ class JITFunction(KernelInterface[T]):
         for hook in self.pre_run_hooks:
             hook(*args, **kwargs)
 
-        kernel_cache, target, backend, binder = self.device_caches[device]
+        kernel_cache, target, backend, binder = self.device_caches[device_key]
         # specialization is list[tuple[str, Any]], where first element of tuple is
         # the type and the second parameter is the 'specialization' value.
         bound_args, specialization, options = binder(*args, **kwargs)
@@ -710,7 +717,6 @@ class JITFunction(KernelInterface[T]):
         from ..compiler import compile, ASTSource
         import json
         import triton.language as tl
-        device = driver.active.get_current_device()
         deserialized_obj = json.loads(specialization_data)
         if deserialized_obj['name'] != self._fn_name:
             raise RuntimeError(
@@ -732,7 +738,7 @@ class JITFunction(KernelInterface[T]):
         }
         key = deserialized_obj['key']
         kernel = compile(src, None, options)
-        self.device_caches[device][0][key] = kernel
+        self.device_caches[get_device_key()][0][key] = kernel
         return kernel
 
     # we do not parse `src` in the constructor because
