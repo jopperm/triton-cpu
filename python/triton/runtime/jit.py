@@ -595,6 +595,12 @@ def convert_to_tuple_if_list(item):
 
     return tuple(item)
 
+    
+def get_device_key():
+    target = driver.active.get_current_target()
+    device = driver.active.get_current_device()
+    return f"{target.backend}:{device}"
+
 
 class JITFunction(JITCallable, KernelInterface[T]):
 
@@ -697,6 +703,7 @@ class JITFunction(JITCallable, KernelInterface[T]):
         kwargs["instrumentation_mode"] = knobs.compilation.instrumentation_mode
 
         # parse options
+        device_key = get_device_key()
         device = driver.active.get_current_device()
         stream = driver.active.get_current_stream(device)
 
@@ -704,7 +711,7 @@ class JITFunction(JITCallable, KernelInterface[T]):
         for hook in self.pre_run_hooks:
             hook(*args, **kwargs)
 
-        kernel_cache, kernel_key_cache, target, backend, binder = self.device_caches[device]
+        kernel_cache, kernel_key_cache, target, backend, binder = self.device_caches[device_key]
         # specialization is list[tuple[str, Any]], where first element of tuple is
         # the type and the second parameter is the 'specialization' value.
         bound_args, specialization, options = binder(*args, **kwargs)
@@ -811,7 +818,7 @@ class JITFunction(JITCallable, KernelInterface[T]):
             for key, value in deserialized_obj['options'].items()
         }
         key = deserialized_obj['key']
-        _, _, _, backend, _ = self.device_caches[device]
+        _, _, _, backend, _ = self.device_caches[get_device_key()]
         options = backend.parse_options(options)
         return self._do_compile(
             key,
@@ -824,7 +831,7 @@ class JITFunction(JITCallable, KernelInterface[T]):
         )
 
     def _do_compile(self, key, signature, device, constexprs, options, attrs, warmup):
-        kernel_cache, _, target, backend, _ = self.device_caches[device]
+        kernel_cache, _, target, backend, _ = self.device_caches[get_device_key()]
 
         if self._call_hook(knobs.runtime.jit_cache_hook, key, signature, device, constexprs, options, [attrs], warmup):
             return None
