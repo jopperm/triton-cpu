@@ -611,6 +611,13 @@ def compute_cache_key(kernel_key_cache, specialization, options):
 
 
 class JITFunction(JITCallable, KernelInterface[T]):
+def get_device_key():
+    target = driver.active.get_current_target()
+    device = driver.active.get_current_device()
+    return f"{target.backend}:{device}"
+
+
+class JITFunction(KernelInterface[T]):
 
     def is_gluon(self):
         return False
@@ -710,6 +717,7 @@ class JITFunction(JITCallable, KernelInterface[T]):
         kwargs["debug"] = kwargs.get("debug", self.debug) or knobs.runtime.debug
 
         # parse options
+        device_key = get_device_key()
         device = driver.active.get_current_device()
         stream = driver.active.get_current_stream(device)
 
@@ -717,7 +725,7 @@ class JITFunction(JITCallable, KernelInterface[T]):
         for hook in self.pre_run_hooks:
             hook(*args, **kwargs)
 
-        kernel_cache, kernel_key_cache, target, backend, binder = self.device_caches[device]
+        kernel_cache, kernel_key_cache, target, backend, binder = self.device_caches[device_key]
         # specialization is list[tuple[str, Any]], where first element of tuple is
         # the type and the second parameter is the 'specialization' value.
         bound_args, specialization, options = binder(*args, **kwargs)
@@ -803,7 +811,6 @@ class JITFunction(JITCallable, KernelInterface[T]):
     def preload(self, specialization_data):
         import json
         import triton.language as tl
-        device = driver.active.get_current_device()
         deserialized_obj = json.loads(specialization_data)
         if deserialized_obj['name'] != self._fn_name:
             raise RuntimeError(
@@ -823,7 +830,7 @@ class JITFunction(JITCallable, KernelInterface[T]):
             for key, value in deserialized_obj['options'].items()
         }
         key = deserialized_obj['key']
-        _, _, _, backend, _ = self.device_caches[device]
+        _, _, _, backend, _ = self.device_caches[get_device_key()]
         options = backend.parse_options(options)
         return self._do_compile(
             key,
