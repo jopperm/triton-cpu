@@ -216,7 +216,7 @@ def matmul_kernel(a_ptr, b_ptr, c_ptr, M, N, K, BLOCK_SIZE_M: tl.constexpr, BLOC
 
 
 def matmul(a: torch.Tensor, b: torch.Tensor, c: torch.Tensor, ab: torch.Tensor, bb: torch.Tensor, M, N, K, PREPACKED,
-           BLOCKED_A, TRANSPOSED_BLOCK_A, BLOCKED_B, TRANSPOSED_B, PACKED_B, num_threads=0):
+           BLOCKED_A, TRANSPOSED_BLOCK_A, BLOCKED_B, TRANSPOSED_B, PACKED_B, num_cpu_threads=0):
     #TODO: Currently masked load is not supported yet.
     assert (M % BLOCK_SIZE_M == 0) and (N % BLOCK_SIZE_N == 0) and (
         K % BLOCK_SIZE_K == 0), "Masking currently not supported, Matrix dimensions must be multiples of block size"
@@ -241,7 +241,7 @@ def matmul(a: torch.Tensor, b: torch.Tensor, c: torch.Tensor, ab: torch.Tensor, 
         GROUP_SIZE_M=GROUP_SIZE_M,  #
         BLOCKED_A=BLOCKED_A, TRANSPOSED_BLOCK_A=TRANSPOSED_BLOCK_A,  #
         BLOCKED_B=BLOCKED_B, TRANSPOSED_B=TRANSPOSED_B, PACKED_B=PACKED_B,  #
-        OUT_DTYPE=tl.float32 if a.dtype.is_floating_point else tl.int32, num_threads=num_threads)
+        OUT_DTYPE=tl.float32 if a.dtype.is_floating_point else tl.int32, num_cpu_threads=num_cpu_threads)
     return c
 
 
@@ -412,7 +412,7 @@ def benchmark(M, N, K, provider):
     elif backend == 'triton-cpu':
         ms, min_ms, max_ms = triton.testing.do_bench(
             lambda: matmul(a, b, c, a_tmp, b_tmp, M, N, K, prepack, blocked_a, transposed_a, blocked_b, transposed_b,
-                           packed_b, num_threads=int(single_thread)), quantiles=quantiles, measure_time_with_hooks=True,
+                           packed_b, num_cpu_threads=int(single_thread)), quantiles=quantiles, measure_time_with_hooks=True,
             rep=1000)
     perf = lambda ms: 2 * M * N * K * 1e-9 / (ms * 1e-3)
     return perf(ms), perf(max_ms), perf(min_ms)
