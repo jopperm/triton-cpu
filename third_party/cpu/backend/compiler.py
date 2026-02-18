@@ -316,7 +316,8 @@ class CPUBackend(BaseBackend):
             Path(asm_path).write_text(src)
             lib_dirs = cpu_driver.library_dirs
             libs = ["m", "TritonCPURuntime", "sleef"]
-            so = _build("kernel", asm_path, tmpdir, lib_dirs, cpu_driver.include_dirs, libs)
+            ccflags = []
+            so = _build("kernel", asm_path, tmpdir, lib_dirs, cpu_driver.include_dirs, libs, ccflags)
             with open(so, "rb") as f:
                 return f.read()
 

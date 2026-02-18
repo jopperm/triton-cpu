@@ -103,6 +103,21 @@ struct SplatOpConversion : public OpConversionPattern<triton::SplatOp> {
   }
 };
 
+struct UnsplatOpConversion : public OpConversionPattern<triton::UnsplatOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(triton::UnsplatOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+    Value val = op.getSrc();
+    SmallVector<int64_t> indices(cast<TensorType>(val.getType()).getRank(), 0);
+    rewriter.replaceOpWithNewOp<vector::ExtractOp>(
+        op, rewriter.getRemappedValue(val), indices);
+    return success();
+  }
+};
+
 struct AddPtrOpConversion : public OpConversionPattern<triton::AddPtrOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -173,6 +188,7 @@ struct ConvertPtrOps : public triton::impl::ConvertPtrOpsBase<ConvertPtrOps> {
     RewritePatternSet patterns(context);
     patterns.add<MakeRangeOpConversion>(typeConverter, context);
     patterns.add<SplatOpConversion>(typeConverter, context);
+    patterns.add<UnsplatOpConversion>(typeConverter, context);
     patterns.add<AddPtrOpConversion>(typeConverter, context);
     patterns.add<PtrToIntOpConversion>(typeConverter, context);
     patterns.add<IntToPtrOpConversion>(typeConverter, context);

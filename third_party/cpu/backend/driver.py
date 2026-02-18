@@ -497,3 +497,7 @@ class CPUDriver(DriverBase):
     # TODO maybe CPU should do anything here
     def clear_cache(self, cache):
         cache.zero_()
+
+    def map_python_to_cpp_type(self, ty: str) -> str:
+        # currently unused by the CPU backend
+        return "void"

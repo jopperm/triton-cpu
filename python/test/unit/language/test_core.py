@@ -6,6 +6,7 @@ from typing import Optional
 import math
 import textwrap
 import pathlib
+import os
 
 import numpy as np
 import pytest
@@ -1969,6 +1970,8 @@ def test_tensor_atomic_cas(sem, size, dtype_str, num_ctas, device):
     check_type_supported(dtype_str, device)
     if "float" in dtype_str and is_hip():
         pytest.skip("HIP does not support atomic cas with float types")
+    if "float" in dtype_str and is_cpu():
+        pytest.skip("CPU does not support atomic cas with float types")
 
     @triton.jit
     def change_value(X, BLOCK_SIZE: tl.constexpr, sem: tl.constexpr, dtype: tl.constexpr):

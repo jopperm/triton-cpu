@@ -610,14 +610,13 @@ def compute_cache_key(kernel_key_cache, specialization, options):
     return cache_key
 
 
-class JITFunction(JITCallable, KernelInterface[T]):
 def get_device_key():
     target = driver.active.get_current_target()
     device = driver.active.get_current_device()
     return f"{target.backend}:{device}"
 
 
-class JITFunction(KernelInterface[T]):
+class JITFunction(JITCallable, KernelInterface[T]):
 
     def is_gluon(self):
         return False
