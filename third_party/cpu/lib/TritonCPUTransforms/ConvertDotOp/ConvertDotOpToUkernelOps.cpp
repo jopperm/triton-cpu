@@ -539,7 +539,8 @@ convertCandidate(DotOpCandidate &candidate, Ukernels ukernels,
   }
   LDBG("Loading the result to a vector to replace orig op result.");
   Value newVal = rewriter.create<vector::TransferReadOp>(
-      loc, cast<VectorType>(toFp32(resTy)), accBuf.memRef, accBuf.indices);
+      loc, cast<VectorType>(toFp32(resTy)), accBuf.memRef, accBuf.indices,
+      arith::getZeroConstant(rewriter, loc, rewriter.getF32Type()));
   // We might need to cast back to the original type.
   newVal = maybeCast(loc, newVal, resElemTy, rewriter);
   op.getResult().replaceAllUsesWith(newVal);

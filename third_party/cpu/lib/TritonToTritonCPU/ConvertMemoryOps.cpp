@@ -574,8 +574,9 @@ struct CpuLoadOpConversion : public MemoryOpConversion<triton::cpu::LoadOp> {
         getTypeConverter()->convertType(loadOp.getResult().getType()));
     Value zeroIdx = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     SmallVector<Value> indices(resTy.getRank(), zeroIdx);
-    auto vecRead =
-        rewriter.create<vector::TransferReadOp>(loc, resTy, memRef, indices);
+    auto vecRead = rewriter.create<vector::TransferReadOp>(
+        loc, resTy, memRef, indices,
+        arith::getZeroConstant(rewriter, loc, resTy.getElementType()));
     rewriter.replaceOp(loadOp, vecRead);
     return success();
   }

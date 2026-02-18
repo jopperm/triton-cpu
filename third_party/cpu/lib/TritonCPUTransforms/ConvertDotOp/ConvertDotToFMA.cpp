@@ -209,7 +209,7 @@ SmallVector<Value> computePrefetchIndices(Location loc, const MemBuffer &buf,
     } else {
       if (!itersVal)
         itersVal =
-            rewriter.create<arith::ConstantIntOp>(loc, iters, step.getType());
+            rewriter.create<arith::ConstantIntOp>(loc, step.getType(), iters);
       scaledStep.push_back(rewriter.create<arith::IndexCastOp>(
           loc, rewriter.getIndexType(),
           rewriter.create<arith::MulIOp>(loc, step.getType(), step, itersVal)));

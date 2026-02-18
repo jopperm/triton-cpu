@@ -68,7 +68,7 @@ struct HistogramOpConversion : public OpConversionPattern<triton::HistogramOp> {
     for (int64_t i = 0; i < srcTy.getShape()[0]; ++i) {
       Value idx = rewriter.create<arith::ConstantOp>(
           loc, rewriter.getIndexType(), rewriter.getIndexAttr(i));
-      Value elem = rewriter.create<vector::ExtractElementOp>(loc, src, idx);
+      Value elem = rewriter.create<vector::ExtractOp>(loc, src, idx);
       Value elemVec = rewriter.create<vector::BroadcastOp>(loc, cmpVecTy, elem);
       Value mask = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
                                                   elemVec, rangeVec);

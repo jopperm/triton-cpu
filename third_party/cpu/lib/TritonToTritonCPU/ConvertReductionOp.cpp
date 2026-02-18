@@ -94,7 +94,7 @@ struct ReduceOpConversion
     Value zero =
         rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(0));
     for (size_t i = 0; i < res.size(); ++i) {
-      res[i] = rewriter.create<vector::ExtractElementOp>(loc, res[i], zero);
+      res[i] = rewriter.create<vector::ExtractOp>(loc, res[i], zero);
     }
     return res;
   }

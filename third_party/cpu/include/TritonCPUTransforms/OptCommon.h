@@ -152,7 +152,8 @@ inline Value shapeCast(Location loc, Value in,
 #define op_fptosi(ty, val) rewriter.create<arith::FPToSIOp>(loc, ty, val)
 #define op_read(ty, memRef, indices)                                           \
   rewriter.create<vector::TransferReadOp>(                                     \
-      loc, ty, memRef, indices, SmallVector<bool>(ty.getRank(), true))
+      loc, ty, memRef, indices, int_cst(ty.getElementType(), 0),               \
+      SmallVector<bool>(ty.getRank(), true))
 #define op_write(val, memRef, indices)                                         \
   rewriter.create<vector::TransferWriteOp>(                                    \
       loc, val, memRef, indices,                                               \

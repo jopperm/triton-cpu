@@ -203,7 +203,7 @@ struct ScaleInductionVariable : public OpRewritePattern<scf::ForOp> {
     if (lowerVal != 0) {
       rewriter.setInsertionPointAfterValue(lower);
       newLower = rewriter.create<arith::ConstantIntOp>(
-          lower.getLoc(), lowerVal * scaleVal, lower.getType());
+          lower.getLoc(), lower.getType(), lowerVal * scaleVal);
     }
     // New Upper bound.
     Value newUpper = divLhs;

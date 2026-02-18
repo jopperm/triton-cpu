@@ -4,6 +4,7 @@
 
 #include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
+#include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Conversion/LLVMCommon/VectorPattern.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
@@ -25,13 +26,6 @@ namespace triton {
 #include "cpu/include/TritonCPUToLLVM/Passes.h.inc"
 } // namespace triton
 } // namespace mlir
-
-namespace mlir {
-FailureOr<LLVM::LLVMFuncOp>
-convertFuncOpToLLVMFuncOp(FunctionOpInterface funcOp,
-                          ConversionPatternRewriter &rewriter,
-                          const LLVMTypeConverter &converter);
-}
 
 using namespace mlir;
 using namespace mlir::triton;
