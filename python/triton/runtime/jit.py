@@ -810,6 +810,7 @@ class JITFunction(JITCallable, KernelInterface[T]):
     def preload(self, specialization_data):
         import json
         import triton.language as tl
+        device = driver.active.get_current_device()
         deserialized_obj = json.loads(specialization_data)
         if deserialized_obj['name'] != self._fn_name:
             raise RuntimeError(
@@ -842,7 +843,7 @@ class JITFunction(JITCallable, KernelInterface[T]):
         )
 
     def _do_compile(self, key, signature, device, constexprs, options, attrs, warmup):
-        kernel_cache, _, target, backend, _ = self.device_caches[device]
+        kernel_cache, _, target, backend, _ = self.device_caches[get_device_key()]
 
         if self._call_hook(knobs.runtime.jit_cache_hook, key, signature, device, constexprs, options, [attrs], warmup):
             return None

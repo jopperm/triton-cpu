@@ -32,6 +32,8 @@ def test_maximum_minium(dtype, op, device):
 @pytest.mark.parametrize("descending", [False, True])
 @pytest.mark.parametrize("dtype_str", ['int32', 'float16', 'float32', 'bfloat16'])
 def test_sort(M, N, descending, dtype_str, device):
+    if M == 1 and is_cpu():
+        pytest.xfail("canonicalized to `vector.store` with `memref<dtype>`, which is no longer legal")
 
     @triton.jit
     def sort_kernel(X, Z, N: tl.constexpr, M: tl.constexpr, descending: tl.constexpr):

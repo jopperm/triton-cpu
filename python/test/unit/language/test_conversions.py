@@ -382,6 +382,8 @@ def test_typeconvert_downcast_clamping(src_dtype, dst_dtype, mode, device, round
 
         if dst_dtype in ('float8e5', 'float8e4nv') and rounding == 'rtne' and torch.cuda.get_device_capability(0) < (9, 0):
             pytest.skip(f"{dst_dtype} downcast with RTNE rounding tests only supported on NVGPU with compute capability 9.0+")
+    if is_cpu():
+        pytest.xfail("NYI in CPU backend")
 
     converter = {
         tl.float8e4nv: torch.float8_e4m3fn,

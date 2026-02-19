@@ -26,6 +26,7 @@ except AttributeError:
 include_dirs = []
 library_dirs = [_triton_C_dir]
 libraries = ["stdc++"]
+ccflags = []
 
 # Skip non-existent paths
 sys_include_dir = os.path.join(_dirname, "include")
@@ -46,7 +47,7 @@ def compile_module_from_src(src, name):
             src_path = os.path.join(tmpdir, "main.cpp")
             with open(src_path, "w") as f:
                 f.write(src)
-            so = _build(name, src_path, tmpdir, library_dirs, include_dirs, libraries)
+            so = _build(name, src_path, tmpdir, library_dirs, include_dirs, libraries, ccflags)
             with open(so, "rb") as f:
                 cache_path = cache.put(f.read(), f"{name}.so", binary=True)
     import importlib.util
@@ -499,5 +500,4 @@ class CPUDriver(DriverBase):
         cache.zero_()
 
     def map_python_to_cpp_type(self, ty: str) -> str:
-        # currently unused by the CPU backend
-        return "void"
+        return ty_to_cpp(ty)
