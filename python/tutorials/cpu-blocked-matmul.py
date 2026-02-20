@@ -412,8 +412,8 @@ def benchmark(M, N, K, provider):
     elif backend == 'triton-cpu':
         ms, min_ms, max_ms = triton.testing.do_bench(
             lambda: matmul(a, b, c, a_tmp, b_tmp, M, N, K, prepack, blocked_a, transposed_a, blocked_b, transposed_b,
-                           packed_b, num_cpu_threads=int(single_thread)), quantiles=quantiles, measure_time_with_hooks=True,
-            rep=1000)
+                           packed_b, num_cpu_threads=int(single_thread)), quantiles=quantiles,
+            measure_time_with_hooks=True, rep=1000)
     perf = lambda ms: 2 * M * N * K * 1e-9 / (ms * 1e-3)
     return perf(ms), perf(max_ms), perf(min_ms)
 

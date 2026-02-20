@@ -4,6 +4,7 @@ from ..backends import backends, DriverBase
 
 import os
 
+
 def _create_driver() -> DriverBase:
     if os.getenv("TRITON_CPU_BACKEND", "0") == "1":
         if "cpu" not in backends:

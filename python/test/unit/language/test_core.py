@@ -367,6 +367,7 @@ def test_empty_kernel_scalar_arg(device):
 
     kernel[(1, )](2)
 
+
 @pytest.mark.interpreter
 def test_scalar_overflow(device):
 

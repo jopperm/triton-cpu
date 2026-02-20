@@ -7,6 +7,7 @@ import numpy as np
 
 from test_core import is_cpu
 
+
 def annotated_function(return_type=None, **arg_types):
     """A decorator to add annotations to a function."""
 
