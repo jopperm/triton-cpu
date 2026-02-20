@@ -52,6 +52,7 @@ class CPUOptions:
     vec_lib: Optional[str] = 'libsleef'
     # TODO: Try to enable it.
     sanitize_overflow: bool = False
+    instrumentation_mode: str = ""
 
     # TODO: We may introduce CPU-specific options like # of cores.
     ukernels: str = None
@@ -163,7 +164,7 @@ class CPUBackend(BaseBackend):
         passes.common.add_cse(pm)
         passes.common.add_licm(pm)
         passes.common.add_symbol_dce(pm)
-        pm.run(mod)
+        pm.run(mod, "make_ttir")
         return mod
 
     @staticmethod
@@ -186,7 +187,7 @@ class CPUBackend(BaseBackend):
         passes.common.add_cse(pm)
         passes.common.add_symbol_dce(pm)
         passes.common.add_canonicalizer(pm)
-        pm.run(mod)
+        pm.run(mod, "make_ttcir")
         metadata["cluster_dims"] = (opt.cluster_dims[0], opt.cluster_dims[1], opt.cluster_dims[2])
         return mod
 
@@ -231,7 +232,7 @@ class CPUBackend(BaseBackend):
         passes.common.add_cse(pm)
         passes.common.add_symbol_dce(pm)
         passes.common.add_canonicalizer(pm)
-        pm.run(mod)
+        pm.run(mod, "make_tttcir")
         return mod
 
     def make_llir(self, src, metadata, options):
@@ -281,7 +282,7 @@ class CPUBackend(BaseBackend):
         passes.common.add_symbol_dce(pm)
         if os.environ.get("TRITON_DISABLE_LINE_INFO", "0") == "0":
             passes.llvmir.add_di_scope(pm)
-        pm.run(mod)
+        pm.run(mod, "make_llir")
 
         # Find kernel fn
         kernel_names = cpu.find_kernel_names(mod)

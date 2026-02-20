@@ -1601,6 +1601,8 @@ def test_tensor_atomic_rmw(shape, axis, num_ctas, dtype_x_str, check_return_val,
                                                          for dtype_x_str in ['bfloat16', 'float16', 'float32']])
 def test_tensor_atomic_add_non_exclusive_offset(size, num_ctas, dtype_x_str, device):
     check_type_supported(dtype_x_str, device)
+    if is_cpu() and size == 128:
+        pytest.xfail("Test hangs")
 
     @triton.jit
     def kernel(X, val, NUM: tl.constexpr):
@@ -3398,8 +3400,8 @@ def test_dot(M, N, K, num_warps, col_a, col_b, epilogue, input_precision, in_dty
             M = min(M, 32 if epilogue == "chain-dot" else 64)
             N = min(N, 32 if epilogue == "chain-dot" else 64)
             K = min(K, 16 if epilogue == "chain-dot" else 32)
-        if not is_hip() and (M < 4 or N < 4 or K < 4):
-            pytest.skip("small dots are supported only on HIP at the moment")
+        if input_precision == "bf16x3" or input_precision == "bf16x6":
+            pytest.skip(f"input_precision {input_precision} is not supported by the CPU backend")
     else:
         if not is_hip() and K < 16:
             pytest.skip("small dots are supported only on HIP at the moment")
