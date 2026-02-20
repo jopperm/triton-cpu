@@ -1738,6 +1738,9 @@ def test_tensor_atomic_rmw_block(num_ctas, device):
 def test_atomic_cas(sem, num_ctas, dtype_str, device):
     if is_hip_cdna2():
         pytest.skip("Disabled due to being flaky on CDNA2")
+    if is_cpu():
+        pytest.xfail("Barriers not yet implemented for CPU backend")
+
     # 1. make sure that atomic_cas changes the original value (Lock)
     @triton.jit
     def change_value(Lock, triton_dtype: tl.constexpr):

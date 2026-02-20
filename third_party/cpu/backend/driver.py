@@ -81,6 +81,10 @@ class CPUUtils(object):
             fn_ptr = getattr(lib, name)
             fn_ptr_as_void_p = ctypes.cast(fn_ptr, ctypes.c_void_p).value
             return (lib, fn_ptr_as_void_p, 0, 0, 0)
+    
+    def unload_module(self, mod):
+        # TODO: implement
+        pass
 
     def get_device_properties(self, *args):
         return {"max_shared_mem": 0}

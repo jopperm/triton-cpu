@@ -486,8 +486,9 @@ struct StoreOpConversion : public MemoryOpConversion<triton::StoreOp> {
           rewriter, loc, MemRefType::get({}, vecTy.getElementType()), basePtr);
       auto scatterIndices = SmallVector<Value>();
 
-      vector::ScatterOp::create(rewriter, loc, vecTy, scatterBase,
-                                scatterIndices, indexVec, scatterMask, val);
+      vector::ScatterOp::create(rewriter, loc, TypeRange{}, scatterBase,
+                                scatterIndices, indexVec, scatterMask, val,
+                                IntegerAttr{});
     }
 
     rewriter.eraseOp(storeOp);

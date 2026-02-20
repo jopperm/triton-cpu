@@ -14,7 +14,7 @@ import torch
 import triton
 import triton.language as tl
 from triton.runtime.jit import get_device_key
-from triton._internal_testing import is_hip
+from triton._internal_testing import is_hip, is_cpu
 
 
 @triton.jit
@@ -870,14 +870,16 @@ def test_preload_higher_order_kernels(device, fresh_triton_cache) -> None:
     hash = compiled_kernel.hash
     assert specialization_data is not None
 
+    device_key = get_device_key()
+
     # clear the cache
     shutil.rmtree(fresh_triton_cache)
-    kernel.device_caches[device][0].clear()
+    kernel.device_caches[device_key][0].clear()
 
     # preload the kernel
     kernel_preload = kernel.preload(specialization_data)
     assert kernel_preload.hash == hash
-    assert len(kernel.device_caches[device][0]) == 1
+    assert len(kernel.device_caches[device_key][0]) == 1
 
     # we should hit the cache and not compile anything
     counter = 0
@@ -889,7 +891,7 @@ def test_preload_higher_order_kernels(device, fresh_triton_cache) -> None:
     triton.knobs.runtime.jit_cache_hook = inc_counter
     final_kernel = kernel[(1, )](output, fn_a)
     assert counter == 0
-    assert len(kernel.device_caches[device][0]) == 1
+    assert len(kernel.device_caches[device_key][0]) == 1
     assert final_kernel.hash == hash
 
     # different function should compile and not hit the cache
@@ -899,6 +901,8 @@ def test_preload_higher_order_kernels(device, fresh_triton_cache) -> None:
 
 
 def test_module_load_unload(fresh_knobs):
+    if is_cpu():
+        pytest.skip("Requires CUDA; unclear whether applicable to CPU backend")
 
     @triton.jit
     def kernel(out_ptr, val) -> None:

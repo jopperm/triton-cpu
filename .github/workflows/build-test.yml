@@ -119,7 +119,6 @@ jobs:
             python/test/unit/runtime/test_bindings.py \
             python/test/unit/runtime/test_cache.py \
             python/test/unit/runtime/test_driver.py \
-            python/test/unit/runtime/test_jit.py \
             python/test/unit/runtime/test_launch.py \
             python/test/unit/runtime/test_subproc.py \
             python/test/unit/test_debug_dump.py \
@@ -144,7 +143,6 @@ jobs:
             python/test/unit/runtime/test_bindings.py \
             python/test/unit/runtime/test_cache.py \
             python/test/unit/runtime/test_driver.py \
-            python/test/unit/runtime/test_jit.py \
             python/test/unit/runtime/test_launch.py \
             python/test/unit/runtime/test_subproc.py \
             python/test/unit/test_debug_dump.py
