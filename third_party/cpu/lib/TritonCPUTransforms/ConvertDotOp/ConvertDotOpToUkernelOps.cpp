@@ -517,9 +517,20 @@ convertCandidate(DotOpCandidate &candidate, Ukernels ukernels,
 
     // We might need to cast back to the original type.
     newVal = maybeCast(loc, newVal, resElemTy, rewriter);
-    rewriter.replaceAllOpUsesWith(
-        forOp,
-        ValueRange{newVal, candidate.lhsBuf.memRef, candidate.rhsBuf.memRef});
+
+    // Determine the order of loop-carried values.
+    const auto &forInits = forOp.getInits();
+    auto lhsBlockPtrIt = llvm::find(forInits, candidate.lhsBuf.origBlockPtr);
+    auto rhsBlockPtrIt = llvm::find(forInits, candidate.rhsBuf.origBlockPtr);
+    assert(lhsBlockPtrIt != forInits.end() && rhsBlockPtrIt != forInits.end());
+
+    SmallVector<Value> forResults{3, newVal};
+    forResults[std::distance(forInits.begin(), lhsBlockPtrIt)] =
+        candidate.lhsBuf.memRef;
+    forResults[std::distance(forInits.begin(), rhsBlockPtrIt)] =
+        candidate.rhsBuf.memRef;
+
+    rewriter.replaceAllOpUsesWith(forOp, forResults);
     return success();
   }
 
