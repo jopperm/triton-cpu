@@ -17,10 +17,10 @@ module {
     %cst_0 = arith.constant dense<0.000000e+00> : vector<16xf32>
     %0 = arith.addi %arg2, %c15_i32 : i32
     %1 = arith.divsi %0, %c16_i32 : i32
-    %2 = vector.splat %arg2 : vector<16xi32>
+    %2 = vector.broadcast %arg2 : i32 to vector<16xi32>
     scf.for %arg3 = %c0_i32 to %1 step %c1_i32  : i32 {
       %3 = arith.muli %arg3, %c16_i32 : i32
-      %4 = vector.splat %3 : vector<16xi32>
+      %4 = vector.broadcast %3 : i32 to vector<16xi32>
       %5 = arith.addi %4, %cst : vector<16xi32>
       %6 = arith.cmpi slt, %5, %2 : vector<16xi32>
       %7 = tt.addptr %arg0, %3 : !tt.ptr<f32>, i32
@@ -53,9 +53,9 @@ module {
     %c16_i32 = arith.constant 16 : i32
     %c0_i32 = arith.constant 0 : i32
     %cst_2 = arith.constant dense<0.000000e+00> : vector<16xf32>
-    %0 = vector.splat %arg2 : vector<16xi32>
+    %0 = vector.broadcast %arg2 : i32 to vector<16xi32>
     %1 = scf.for %arg3 = %c0_i32 to %arg2 step %c16_i32 iter_args(%arg4 = %cst_2) -> (vector<16xf32>)  : i32 {
-      %3 = vector.splat %arg3 : vector<16xi32>
+      %3 = vector.broadcast %arg3 : i32 to vector<16xi32>
       %4 = arith.addi %3, %cst_0 : vector<16xi32>
       %5 = arith.cmpi slt, %4, %0 : vector<16xi32>
       %6 = tt.addptr %arg0, %arg3 : !tt.ptr<f32>, i32

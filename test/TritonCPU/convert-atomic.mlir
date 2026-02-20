@@ -21,7 +21,7 @@ module {
     %cst_1 = arith.constant dense<3.000000e+00> : vector<16xf32>
     %0 = builtin.unrealized_conversion_cast %cst_1 : vector<16xf32> to tensor<16xf32>
     %1 = tt.ptr_to_int %arg0 : !tt.ptr<f32> -> i64
-    %2 = vector.splat %1 : vector<16xi64>
+    %2 = vector.broadcast %1 : i64 to vector<16xi64>
     %3 = arith.addi %2, %cst : vector<16xi64>
     %4 = builtin.unrealized_conversion_cast %3 : vector<16xi64> to tensor<16x!tt.ptr<f32>>
     %5 = vector.extract %3[0] : i64 from vector<16xi64>
