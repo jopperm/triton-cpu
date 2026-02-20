@@ -37,11 +37,11 @@ public:
 
     addDynamicallyLegalOp<triton::AtomicRMWOp>(
         [&](triton::AtomicRMWOp op) -> std::optional<bool> {
-          return converter.isLegal(op) && !op.getMask();
+          return converter.isLegal(op.getOperation()) && !op.getMask();
         });
     addDynamicallyLegalOp<triton::AtomicCASOp>(
         [&](triton::AtomicCASOp op) -> std::optional<bool> {
-          return converter.isLegal(op);
+          return converter.isLegal(op.getOperation());
         });
   }
 };

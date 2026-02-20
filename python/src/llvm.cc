@@ -87,7 +87,6 @@ createTargetMachine(llvm::Module *module, std::string proc,
     opt.NoNaNsFPMath = true;
     opt.NoTrappingFPMath = true;
     opt.NoSignedZerosFPMath = true;
-    opt.ApproxFuncFPMath = true;
   } else {
     opt.UnsafeFPMath = false;
     opt.NoInfsFPMath = false;
