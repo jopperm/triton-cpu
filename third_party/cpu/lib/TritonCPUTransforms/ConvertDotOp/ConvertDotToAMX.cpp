@@ -318,12 +318,12 @@ Value loadWithPrefetch(Location loc, VectorType ty, Value memRef,
   if (!step.empty()) {
     SmallVector<Value> prefetchIndices;
     for (int64_t i = 0; i < indices.size(); ++i) {
-      prefetchIndices.push_back(
-          op_addi(indices[i], rewriter.create<arith::IndexCastOp>(
-                                  loc, rewriter.getIndexType(), step[i])));
+      prefetchIndices.push_back(op_addi(
+          indices[i], arith::IndexCastOp::create(
+                          rewriter, loc, rewriter.getIndexType(), step[i])));
     }
-    rewriter.create<memref::PrefetchOp>(loc, memRef, prefetchIndices, false, 1,
-                                        true);
+    memref::PrefetchOp::create(rewriter, loc, memRef, prefetchIndices, false, 1,
+                               true);
   }
   return res;
 }
@@ -339,7 +339,7 @@ void copyWithInterleave(Location loc, VectorType srcTy, const MemBuffer &src,
   Value rowsPerGroupVal = index_cst(rowsPerGroup);
   VectorType srcVecTy =
       VectorType::get({srcTy.getDimSize(1)}, srcTy.getElementType());
-  auto forOp = rewriter.create<scf::ForOp>(loc, lower, upper, one);
+  auto forOp = scf::ForOp::create(rewriter, loc, lower, upper, one);
   Value ivVal = forOp.getInductionVar();
   rewriter.setInsertionPointToStart(forOp.getBody());
   SmallVector<Value> srcIndices = src.indices;
@@ -463,7 +463,7 @@ Value loadTile(Location loc, amx::TileType tileTy, const MemBuffer &buf,
   auto indices =
       shiftIndices(loc, buf.indices, tileTy, tilesInBlockM, tilesInBlockN,
                    blockM, blockN, tileM, tileN, rewriter);
-  return rewriter.create<amx::TileLoadOp>(loc, tileTy, buf.memRef, indices);
+  return amx::TileLoadOp::create(rewriter, loc, tileTy, buf.memRef, indices);
 }
 
 void storeTile(Location loc, amx::TileType tileTy, Value val,
@@ -473,7 +473,7 @@ void storeTile(Location loc, amx::TileType tileTy, Value val,
   auto indices =
       shiftIndices(loc, buf.indices, tileTy, tilesInBlockM, tilesInBlockN,
                    blockM, blockN, tileM, tileN, rewriter);
-  rewriter.create<amx::TileStoreOp>(loc, buf.memRef, indices, val);
+  amx::TileStoreOp::create(rewriter, loc, buf.memRef, indices, val);
 }
 
 SmallVector<SmallVector<Value>>
@@ -486,7 +486,7 @@ loadBlockTiles(Location loc, amx::TileType tileTy, const MemBuffer &buf,
       Value tile = buf.memRef
                        ? loadTile(loc, tileTy, buf, tilesInBlockM,
                                   tilesInBlockN, blockM, blockN, m, n, rewriter)
-                       : rewriter.create<amx::TileZeroOp>(loc, tileTy);
+                       : amx::TileZeroOp::create(rewriter, loc, tileTy);
       res[m].push_back(tile);
     }
   }
@@ -528,13 +528,13 @@ void multiplyBlocksPreloadLhs(Location loc, amx::TileType lhsTileTy,
 
     for (int64_t tileM = 0; tileM < tilesInBlockM; ++tileM) {
       if (isInteger)
-        accTiles[tileM][tileN] =
-            rewriter.create<amx::TileMulIOp>(loc, accTileTy, lhsTiles[tileM][0],
-                                             rhsTile, accTiles[tileM][tileN]);
+        accTiles[tileM][tileN] = amx::TileMulIOp::create(
+            rewriter, loc, accTileTy, lhsTiles[tileM][0], rhsTile,
+            accTiles[tileM][tileN]);
       else
-        accTiles[tileM][tileN] =
-            rewriter.create<amx::TileMulFOp>(loc, accTileTy, lhsTiles[tileM][0],
-                                             rhsTile, accTiles[tileM][tileN]);
+        accTiles[tileM][tileN] = amx::TileMulFOp::create(
+            rewriter, loc, accTileTy, lhsTiles[tileM][0], rhsTile,
+            accTiles[tileM][tileN]);
 
       // Insert store here to better mix stores with multiplications.
       if (storeResult) {
@@ -564,13 +564,13 @@ void multiplyBlocksPreloadRhs(Location loc, amx::TileType lhsTileTy,
 
     for (int64_t tileN = 0; tileN < tilesInBlockN; ++tileN) {
       if (isInteger)
-        accTiles[tileM][tileN] = rewriter.create<amx::TileMulIOp>(
-            loc, accTileTy, lhsTile, rhsTiles[0][tileN],
-            accTiles[tileM][tileN]);
+        accTiles[tileM][tileN] =
+            amx::TileMulIOp::create(rewriter, loc, accTileTy, lhsTile,
+                                    rhsTiles[0][tileN], accTiles[tileM][tileN]);
       else
-        accTiles[tileM][tileN] = rewriter.create<amx::TileMulFOp>(
-            loc, accTileTy, lhsTile, rhsTiles[0][tileN],
-            accTiles[tileM][tileN]);
+        accTiles[tileM][tileN] =
+            amx::TileMulFOp::create(rewriter, loc, accTileTy, lhsTile,
+                                    rhsTiles[0][tileN], accTiles[tileM][tileN]);
 
       // Insert store here to better mix stores with multiplications.
       if (storeResult) {

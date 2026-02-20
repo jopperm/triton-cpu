@@ -54,8 +54,8 @@ struct ForOpConversion : public OpConversionPattern<scf::ForOp> {
     if (failed(rewriter.getRemappedValues(op.getInitArgs(), initArgs)))
       return failure();
     // Create new for op with remapped values.
-    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), lowerBound,
-                                             upperBound, step, initArgs);
+    auto newOp = scf::ForOp::create(rewriter, op.getLoc(), lowerBound,
+                                    upperBound, step, initArgs);
     // Move the old op block and convert its sigature.
     Block *oldBlock = op.getBody();
     Block *newBlock = newOp.getBody();
@@ -85,8 +85,8 @@ public:
     if (failed(converter->convertTypes(op.getResultTypes(), newResultTypes)))
       return failure();
 
-    auto newOp = rewriter.create<scf::WhileOp>(op.getLoc(), newResultTypes,
-                                               adaptor.getOperands());
+    auto newOp = scf::WhileOp::create(rewriter, op.getLoc(), newResultTypes,
+                                      adaptor.getOperands());
     for (auto i : {0u, 1u}) {
       auto &dstRegion = newOp.getRegion(i);
       rewriter.inlineRegionBefore(op.getRegion(i), dstRegion, dstRegion.end());

@@ -64,8 +64,8 @@ struct ScanOpConversion
       }
       SmallVector<Value> shuffledInput;
       for (auto [val, dummy] : llvm::zip(res, dummies)) {
-        shuffledInput.push_back(rewriter.create<vector::ShuffleOp>(
-            loc, val, dummy, shuffleIndices));
+        shuffledInput.push_back(vector::ShuffleOp::create(
+            rewriter, loc, val, dummy, shuffleIndices));
       }
 
       auto newRes = accumulate(res, shuffledInput, combineOp, rewriter);
@@ -78,8 +78,8 @@ struct ScanOpConversion
       } else {
         std::fill(maskVals.begin(), maskVals.begin() + stride, false);
       }
-      Value mask = rewriter.create<arith::ConstantOp>(
-          loc, maskTy, rewriter.getBoolVectorAttr(maskVals));
+      Value mask = arith::ConstantOp::create(
+          rewriter, loc, maskTy, rewriter.getBoolVectorAttr(maskVals));
       for (size_t i = 0; i < res.size(); ++i) {
         res[i] = vector::selectPassthru(rewriter, mask, newRes[i], res[i]);
       }
@@ -107,15 +107,15 @@ struct ScanOpConversion
     int64_t step = reverse ? -1 : 1;
     for (int64_t idx = start; idx != end; idx += step) {
       SmallVector<Value> subInputs(inputs.size());
-      std::transform(inputs.begin(), inputs.end(), subInputs.begin(),
-                     [&](auto val) {
-                       return rewriter.create<vector::ExtractOp>(loc, val, idx);
-                     });
+      std::transform(
+          inputs.begin(), inputs.end(), subInputs.begin(), [&](auto val) {
+            return vector::ExtractOp::create(rewriter, loc, val, idx);
+          });
 
       acc = accumulate(subInputs, acc, combineOp, rewriter);
 
       for (size_t i = 0; i < res.size(); ++i) {
-        res[i] = rewriter.create<vector::InsertOp>(loc, acc[i], res[i], idx);
+        res[i] = vector::InsertOp::create(rewriter, loc, acc[i], res[i], idx);
       }
     }
     return res;

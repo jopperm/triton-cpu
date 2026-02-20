@@ -39,8 +39,8 @@ namespace {
 
 inline Value intLLVMConst(Location loc, Type ty, int64_t val,
                           PatternRewriter &rewriter) {
-  return rewriter.create<LLVM::ConstantOp>(
-      loc, IntegerAttr::get(getElementTypeOrSelf(ty), val));
+  return LLVM::ConstantOp::create(
+      rewriter, loc, IntegerAttr::get(getElementTypeOrSelf(ty), val));
 }
 
 static inline int64_t getXSMMDataTypeVal(Type ty) {
@@ -84,8 +84,8 @@ LLVM::LLVMFuncOp getFuncDecl(ConversionPatternRewriter &rewriter,
   ConversionPatternRewriter::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToStart(moduleOp.getBody());
 
-  return rewriter.create<LLVM::LLVMFuncOp>(UnknownLoc::get(ctx), funcName,
-                                           funcType);
+  return LLVM::LLVMFuncOp::create(rewriter, UnknownLoc::get(ctx), funcName,
+                                  funcType);
 }
 
 struct BrgemmCreateConversion : public ConvertOpToLLVMPattern<BrgemmCreate> {
@@ -140,8 +140,8 @@ struct BrgemmExecuteConversion : public ConvertOpToLLVMPattern<BrgemmExecute> {
 
     std::string invokeName = "xsmm_brgemm_invoke";
 
-    auto brgemm_kernel_hash_ptr = rewriter.create<LLVM::IntToPtrOp>(
-        loc, ptr_ty(ctx), adaptor.getBrgemmKernelHash());
+    auto brgemm_kernel_hash_ptr = LLVM::IntToPtrOp::create(
+        rewriter, loc, ptr_ty(ctx), adaptor.getBrgemmKernelHash());
 
     auto brgemmArgs = SmallVector<Value>{
         brgemm_kernel_hash_ptr,

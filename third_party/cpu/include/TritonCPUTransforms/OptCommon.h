@@ -82,7 +82,7 @@ inline Value intCst(Location loc, Type ty, int64_t val,
   TypedAttr valAttr = IntegerAttr::get(getElemTyOrTy(ty), val);
   if (auto vecTy = dyn_cast<VectorType>(ty))
     valAttr = SplatElementsAttr::get(vecTy, valAttr);
-  return rewriter.create<arith::ConstantOp>(loc, valAttr);
+  return arith::ConstantOp::create(rewriter, loc, valAttr);
 }
 
 inline Value fpCst(Location loc, Type ty, double val,
@@ -90,7 +90,7 @@ inline Value fpCst(Location loc, Type ty, double val,
   TypedAttr valAttr = FloatAttr::get(getElemTyOrTy(ty), val);
   if (auto vecTy = dyn_cast<VectorType>(ty))
     valAttr = SplatElementsAttr::get(vecTy, valAttr);
-  return rewriter.create<arith::ConstantOp>(loc, valAttr);
+  return arith::ConstantOp::create(rewriter, loc, valAttr);
 }
 
 template <typename T, std::enable_if_t<std::is_integral<T>::value, bool> = true>
@@ -109,7 +109,7 @@ inline Value shapeCast(Location loc, Value in, VectorType outTy,
   VectorType inTy = cast<VectorType>(in.getType());
   assert(outTy.getElementType() == inTy.getElementType());
   assert(outTy.getNumElements() == inTy.getNumElements());
-  return rewriter.create<vector::ShapeCastOp>(loc, outTy, in);
+  return vector::ShapeCastOp::create(rewriter, loc, outTy, in);
 }
 
 inline Value shapeCast(Location loc, Value in,
@@ -125,65 +125,66 @@ inline Value shapeCast(Location loc, Value in,
 } // namespace mlir
 
 #define int_cst(ty, val) intCst(loc, ty, val, rewriter)
-#define index_cst(val) rewriter.create<arith::ConstantIndexOp>(loc, val)
+#define index_cst(val) arith::ConstantIndexOp::create(rewriter, loc, val)
 #define cst_like(src, val) cstLike(loc, src, val, rewriter)
 
-#define op_addi(lhs, rhs) rewriter.create<arith::AddIOp>(loc, lhs, rhs)
-#define op_addf(lhs, rhs) rewriter.create<arith::AddFOp>(loc, lhs, rhs)
-#define op_subi(lhs, rhs) rewriter.create<arith::SubIOp>(loc, lhs, rhs)
-#define op_subf(lhs, rhs) rewriter.create<arith::SubFOp>(loc, lhs, rhs)
-#define op_muli(lhs, rhs) rewriter.create<arith::MulIOp>(loc, lhs, rhs)
-#define op_mulf(lhs, rhs) rewriter.create<arith::MulFOp>(loc, lhs, rhs)
-#define op_divsi(lhs, rhs) rewriter.create<arith::DivSIOp>(loc, lhs, rhs)
-#define op_divui(lhs, rhs) rewriter.create<arith::DivUIOp>(loc, lhs, rhs)
-#define op_bitcast(ty, val) rewriter.create<arith::BitcastOp>(loc, ty, val)
-#define op_lshr(lhs, rhs) rewriter.create<arith::ShRUIOp>(loc, lhs, rhs)
-#define op_shl(lhs, rhs) rewriter.create<arith::ShLIOp>(loc, lhs, rhs)
-#define op_trunci(ty, val) rewriter.create<arith::TruncIOp>(loc, ty, val)
-#define op_zext(ty, val) rewriter.create<arith::ExtUIOp>(loc, ty, val)
-#define op_sext(ty, val) rewriter.create<arith::ExtSIOp>(loc, ty, val)
-#define op_and(lhs, rhs) rewriter.create<arith::AndIOp>(loc, lhs, rhs)
-#define op_or(lhs, rhs) rewriter.create<arith::OrIOp>(loc, lhs, rhs)
-#define op_minui(lhs, rhs) rewriter.create<arith::MinUIOp>(loc, lhs, rhs)
-#define op_maxui(lhs, rhs) rewriter.create<arith::MaxUIOp>(loc, lhs, rhs)
+#define op_addi(lhs, rhs) arith::AddIOp::create(rewriter, loc, lhs, rhs)
+#define op_addf(lhs, rhs) arith::AddFOp::create(rewriter, loc, lhs, rhs)
+#define op_subi(lhs, rhs) arith::SubIOp::create(rewriter, loc, lhs, rhs)
+#define op_subf(lhs, rhs) arith::SubFOp::create(rewriter, loc, lhs, rhs)
+#define op_muli(lhs, rhs) arith::MulIOp::create(rewriter, loc, lhs, rhs)
+#define op_mulf(lhs, rhs) arith::MulFOp::create(rewriter, loc, lhs, rhs)
+#define op_divsi(lhs, rhs) arith::DivSIOp::create(rewriter, loc, lhs, rhs)
+#define op_divui(lhs, rhs) arith::DivUIOp::create(rewriter, loc, lhs, rhs)
+#define op_bitcast(ty, val) arith::BitcastOp::create(rewriter, loc, ty, val)
+#define op_lshr(lhs, rhs) arith::ShRUIOp::create(rewriter, loc, lhs, rhs)
+#define op_shl(lhs, rhs) arith::ShLIOp::create(rewriter, loc, lhs, rhs)
+#define op_trunci(ty, val) arith::TruncIOp::create(rewriter, loc, ty, val)
+#define op_zext(ty, val) arith::ExtUIOp::create(rewriter, loc, ty, val)
+#define op_sext(ty, val) arith::ExtSIOp::create(rewriter, loc, ty, val)
+#define op_and(lhs, rhs) arith::AndIOp::create(rewriter, loc, lhs, rhs)
+#define op_or(lhs, rhs) arith::OrIOp::create(rewriter, loc, lhs, rhs)
+#define op_minui(lhs, rhs) arith::MinUIOp::create(rewriter, loc, lhs, rhs)
+#define op_maxui(lhs, rhs) arith::MaxUIOp::create(rewriter, loc, lhs, rhs)
 #define op_select(cond, val, other)                                            \
-  rewriter.create<arith::SelectOp>(loc, cond, val, other)
-#define op_sitofp(ty, val) rewriter.create<arith::SIToFPOp>(loc, ty, val)
-#define op_fptosi(ty, val) rewriter.create<arith::FPToSIOp>(loc, ty, val)
+  arith::SelectOp::create(rewriter, loc, cond, val, other)
+#define op_sitofp(ty, val) arith::SIToFPOp::create(rewriter, loc, ty, val)
+#define op_fptosi(ty, val) arith::FPToSIOp::create(rewriter, loc, ty, val)
 #define op_read(ty, memRef, indices)                                           \
-  rewriter.create<vector::TransferReadOp>(                                     \
-      loc, ty, memRef, indices,                                                \
+  vector::TransferReadOp::create(                                              \
+      rewriter, loc, ty, memRef, indices,                                      \
       arith::getZeroConstant(rewriter, loc, ty.getElementType()),              \
       SmallVector<bool>(ty.getRank(), true))
 #define op_write(val, memRef, indices)                                         \
-  rewriter.create<vector::TransferWriteOp>(                                    \
-      loc, val, memRef, indices,                                               \
+  vector::TransferWriteOp::create(                                             \
+      rewriter, loc, val, memRef, indices,                                     \
       SmallVector<bool>(cast<VectorType>(val.getType()).getRank(), true))
 #define op_interleave(lhs, rhs)                                                \
-  rewriter.create<vector::InterleaveOp>(loc, lhs, rhs)
-#define op_extract(vec, idx) rewriter.create<vector::ExtractOp>(loc, vec, idx)
+  vector::InterleaveOp::create(rewriter, loc, lhs, rhs)
+#define op_extract(vec, idx) vector::ExtractOp::create(rewriter, loc, vec, idx)
 #define op_store(val, mem, idx)                                                \
-  rewriter.create<vector::StoreOp>(loc, val, mem, idx)
-#define op_index_cast(ty, val) rewriter.create<arith::IndexCastOp>(loc, ty, val)
+  vector::StoreOp::create(rewriter, loc, val, mem, idx)
+#define op_index_cast(ty, val)                                                 \
+  arith::IndexCastOp::create(rewriter, loc, ty, val)
 #define op_icmp_eq(lhs, rhs)                                                   \
-  rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq, lhs, rhs)
+  arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::eq, lhs, rhs)
 #define op_icmp_ne(lhs, rhs)                                                   \
-  rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ne, lhs, rhs)
+  arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::ne, lhs, rhs)
 #define op_icmp_ugt(lhs, rhs)                                                  \
-  rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ugt, lhs, rhs)
+  arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::ugt, lhs, rhs)
 #define op_icmp_uge(lhs, rhs)                                                  \
-  rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::uge, lhs, rhs)
+  arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::uge, lhs, rhs)
 #define op_icmp_ult(lhs, rhs)                                                  \
-  rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ult, lhs, rhs)
+  arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::ult, lhs, rhs)
 #define op_icmp_ule(lhs, rhs)                                                  \
-  rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ule, lhs, rhs)
+  arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::ule, lhs, rhs)
 #define op_icmp_sgt(lhs, rhs)                                                  \
-  rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::sgt, lhs, rhs)
+  arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::sgt, lhs, rhs)
 #define op_icmp_sge(lhs, rhs)                                                  \
-  rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::sge, lhs, rhs)
+  arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::sge, lhs, rhs)
 #define op_icmp_slt(lhs, rhs)                                                  \
-  rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::slt, lhs, rhs)
+  arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::slt, lhs, rhs)
 #define op_icmp_sle(lhs, rhs)                                                  \
-  rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::sle, lhs, rhs)
+  arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::sle, lhs, rhs)
 
 #endif

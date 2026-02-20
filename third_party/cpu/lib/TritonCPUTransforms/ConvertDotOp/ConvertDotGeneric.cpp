@@ -90,7 +90,7 @@ struct DotOpConversion : public OpConversionPattern<cpu::DotOp> {
                                   ConversionPatternRewriter &rewriter) const {
     SmallVector<Value> res;
     for (auto &val : vals) {
-      auto op = rewriter.create<vector::DeinterleaveOp>(loc, val);
+      auto op = vector::DeinterleaveOp::create(rewriter, loc, val);
       res.push_back(op.getResult(0));
       res.push_back(op.getResult(1));
     }

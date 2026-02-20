@@ -214,13 +214,13 @@ Value maybeCast(Location loc, Value val, Type dstElemTy,
   VectorType dstTy = srcTy.cloneWith(std::nullopt, dstElemTy);
   if (srcTy.getElementType().isInteger()) {
     if (srcTy.getElementTypeBitWidth() < dstTy.getElementTypeBitWidth())
-      return rewriter.create<arith::ExtSIOp>(loc, dstTy, val);
-    return rewriter.create<arith::TruncIOp>(loc, dstTy, val);
+      return arith::ExtSIOp::create(rewriter, loc, dstTy, val);
+    return arith::TruncIOp::create(rewriter, loc, dstTy, val);
   }
 
   if (srcTy.getElementTypeBitWidth() < dstTy.getElementTypeBitWidth())
-    return rewriter.create<arith::ExtFOp>(loc, dstTy, val);
-  return rewriter.create<arith::TruncFOp>(loc, dstTy, val);
+    return arith::ExtFOp::create(rewriter, loc, dstTy, val);
+  return arith::TruncFOp::create(rewriter, loc, dstTy, val);
 }
 
 MemBuffer allocateTmpBufferStack(Location loc, VectorType vecTy,
@@ -229,9 +229,10 @@ MemBuffer allocateTmpBufferStack(Location loc, VectorType vecTy,
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(allocaPoint);
   auto memRefTy = MemRefType::get(vecTy.getShape(), vecTy.getElementType());
-  Value memRef = rewriter.create<memref::AllocaOp>(
-      loc, memRefTy, rewriter.getIntegerAttr(rewriter.getI64Type(), 64));
-  Value zeroIdx = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  Value memRef = memref::AllocaOp::create(
+      rewriter, loc, memRefTy,
+      rewriter.getIntegerAttr(rewriter.getI64Type(), 64));
+  Value zeroIdx = arith::ConstantIndexOp::create(rewriter, loc, 0);
   SmallVector<Value> indices(2, zeroIdx);
   return {memRef, indices};
 }
@@ -246,11 +247,11 @@ Value shiftIndex(Location loc, Value index, int64_t offs,
   auto cstOp = dyn_cast<arith::ConstantOp>(index.getDefiningOp());
   if (cstOp) {
     int64_t oldVal = cast<IntegerAttr>(cstOp.getValue()).getInt();
-    return rewriter.create<arith::ConstantIndexOp>(loc, oldVal + offs);
+    return arith::ConstantIndexOp::create(rewriter, loc, oldVal + offs);
   }
 
-  Value offsVal = rewriter.create<arith::ConstantIndexOp>(loc, offs);
-  return rewriter.create<arith::AddIOp>(loc, index.getType(), index, offsVal);
+  Value offsVal = arith::ConstantIndexOp::create(rewriter, loc, offs);
+  return arith::AddIOp::create(rewriter, loc, index.getType(), index, offsVal);
 }
 
 MemBuffer storeToTmpBuffer(Location loc, Value val, Operation *allocaPoint,

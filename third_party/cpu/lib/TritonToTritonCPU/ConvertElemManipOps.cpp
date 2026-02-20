@@ -75,8 +75,8 @@ struct ReshapeOpConversion : public OpConversionPattern<triton::ReshapeOp> {
           op, VectorType::get(dstShape, elemTy), src);
     } else {
       SmallVector<int64_t> tmpShape({resTy.getNumElements()});
-      auto tmp = rewriter.create<vector::ShapeCastOp>(
-          loc, VectorType::get(tmpShape, elemTy), src);
+      auto tmp = vector::ShapeCastOp::create(
+          rewriter, loc, VectorType::get(tmpShape, elemTy), src);
       rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(
           op, VectorType::get(dstShape, elemTy), tmp);
     }
@@ -140,7 +140,7 @@ struct JoinOpConversion : public OpConversionPattern<triton::JoinOp> {
     auto loc = op.getLoc();
     auto lhs = rewriter.getRemappedValue(op.getLhs());
     auto rhs = rewriter.getRemappedValue(op.getRhs());
-    auto interleave = rewriter.create<vector::InterleaveOp>(loc, lhs, rhs);
+    auto interleave = vector::InterleaveOp::create(rewriter, loc, lhs, rhs);
     // JoinOp creates a new dimension, but InterleaveOp doubles the final one.
     // Use ShapeCastOp to get the required shape.
     auto resTy = getTypeConverter()->convertType(op.getType());
@@ -181,14 +181,15 @@ struct SplitOpConversion : public OpConversionPattern<triton::SplitOp> {
 
     SmallVector<Value> results;
     if (srcTy.getRank() == 1) {
-      results.push_back(rewriter.create<vector::ExtractOp>(loc, src, 0));
-      results.push_back(rewriter.create<vector::ExtractOp>(loc, src, 1));
+      results.push_back(vector::ExtractOp::create(rewriter, loc, src, 0));
+      results.push_back(vector::ExtractOp::create(rewriter, loc, src, 1));
       rewriter.replaceOp(op, results);
     } else {
       SmallVector<int64_t> tmpShape(srcTy.getShape().drop_back());
       tmpShape.back() *= 2;
-      auto tmp = rewriter.create<vector::ShapeCastOp>(
-          loc, VectorType::get(tmpShape, srcTy.getElementType()), src);
+      auto tmp = vector::ShapeCastOp::create(
+          rewriter, loc, VectorType::get(tmpShape, srcTy.getElementType()),
+          src);
       rewriter.replaceOpWithNewOp<vector::DeinterleaveOp>(op, tmp);
     }
     return success();

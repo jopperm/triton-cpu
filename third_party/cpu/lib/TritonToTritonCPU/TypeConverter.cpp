@@ -19,7 +19,7 @@ TritonToTritonCPUTypeConverter::TritonToTritonCPUTypeConverter() {
   // here for users.
   addSourceMaterialization([&](OpBuilder &builder, Type type, ValueRange inputs,
                                Location loc) -> Value {
-    return builder.create<UnrealizedConversionCastOp>(loc, type, inputs)
+    return UnrealizedConversionCastOp::create(builder, loc, type, inputs)
         .getResult(0);
   });
 
@@ -27,7 +27,7 @@ TritonToTritonCPUTypeConverter::TritonToTritonCPUTypeConverter() {
   addTargetMaterialization([&](OpBuilder &builder, Type type, ValueRange inputs,
                                Location loc) -> Value {
     if (isa<VectorType>(type))
-      return builder.create<UnrealizedConversionCastOp>(loc, type, inputs)
+      return UnrealizedConversionCastOp::create(builder, loc, type, inputs)
           .getResult(0);
     llvm::errs() << "Inputs: ";
     llvm::interleaveComma(inputs, llvm::errs());

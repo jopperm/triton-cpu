@@ -75,8 +75,8 @@ struct MakeRangeOpConversion : public OpConversionPattern<triton::MakeRangeOp> {
     }
 
     Type resTy = getTypeConverter()->convertType(op.getType());
-    auto newOp = rewriter.create<arith::ConstantOp>(
-        op.getLoc(), resTy, rewriter.getI32VectorAttr(values));
+    auto newOp = arith::ConstantOp::create(rewriter, op.getLoc(), resTy,
+                                           rewriter.getI32VectorAttr(values));
 
     rewriter.replaceOp(op, newOp);
     return success();
@@ -93,10 +93,10 @@ struct SplatOpConversion : public OpConversionPattern<triton::SplatOp> {
     Value val = op.getSrc();
     // Cast pointer
     if (isa<PointerType>(val.getType()))
-      val = rewriter.create<PtrToIntOp>(loc, rewriter.getI64Type(), val)
+      val = PtrToIntOp::create(rewriter, loc, rewriter.getI64Type(), val)
                 .getResult();
     Type resType = getTypeConverter()->convertType(op.getType());
-    auto cast = rewriter.create<vector::SplatOp>(loc, resType, val);
+    auto cast = vector::BroadcastOp::create(rewriter, loc, resType, val);
 
     rewriter.replaceOp(op, cast);
     return success();
@@ -135,14 +135,14 @@ struct AddPtrOpConversion : public OpConversionPattern<triton::AddPtrOp> {
     VectorType offsetTy = cast<VectorType>(offset.getType());
     VectorType ptrTy = cast<VectorType>(ptr.getType());
     // Build scale vector. i1 elements take 1 byte.
-    Value scale = rewriter.create<arith::ConstantOp>(
-        loc, offsetTy,
+    Value scale = arith::ConstantOp::create(
+        rewriter, loc, offsetTy,
         SplatElementsAttr::get(
             offsetTy, rewriter.getIntegerAttr(offsetTy.getElementType(),
                                               (elemBitWidth + 7) / 8)));
-    offset = rewriter.create<arith::MulIOp>(loc, offset, scale);
+    offset = arith::MulIOp::create(rewriter, loc, offset, scale);
     if (offsetTy.getElementTypeBitWidth() < ptrTy.getElementTypeBitWidth())
-      offset = rewriter.create<arith::ExtSIOp>(loc, ptr.getType(), offset);
+      offset = arith::ExtSIOp::create(rewriter, loc, ptr.getType(), offset);
     rewriter.replaceOpWithNewOp<arith::AddIOp>(op, ptr.getType(), ptr, offset);
     return success();
   }

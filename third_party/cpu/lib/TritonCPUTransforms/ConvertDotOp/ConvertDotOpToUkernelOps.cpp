@@ -280,8 +280,8 @@ Value addMemrefSubView(PatternRewriter &rewriter, Location loc,
     shape[start_ind] = vecTy.getShape()[ind];
   }
 
-  Value memRef_view = rewriter.create<memref::SubViewOp>(
-      loc, memRef, getAsOpFoldResult(indices),
+  Value memRef_view = memref::SubViewOp::create(
+      rewriter, loc, memRef, getAsOpFoldResult(indices),
       getAsIndexOpFoldResult(ctx, shape), getAsIndexOpFoldResult(ctx, strides));
   LDBG("Adding subview with type: " << memRef_view);
   return memRef_view;
@@ -308,11 +308,11 @@ extractBufferFromBlockPtr(Value blockPtr, triton::cpu::DotOp &dotOp,
       auto layout = StridedLayoutAttr::get(ctx, 0, dynVals);
       memRefTy = MemRefType::get(dynVals, elemTy, layout);
     }
-    return rewriter.create<ExtractMemRefOp>(loc, memRefTy, ptr);
+    return ExtractMemRefOp::create(rewriter, loc, memRefTy, ptr);
   };
 
   auto memRef = extractMemref(blockPtr);
-  auto indices = rewriter.create<ExtractIndicesOp>(loc, blockPtr).getResults();
+  auto indices = ExtractIndicesOp::create(rewriter, loc, blockPtr).getResults();
 
   return {memRef, indices};
 }
@@ -462,11 +462,11 @@ convertCandidate(DotOpCandidate &candidate, Ukernels ukernels,
                        candidate.rhsBuf.memRef);
 
   auto metadataA =
-      rewriter.create<memref::ExtractStridedMetadataOp>(loc, lhsSubView);
+      memref::ExtractStridedMetadataOp::create(rewriter, loc, lhsSubView);
   auto metadataB =
-      rewriter.create<memref::ExtractStridedMetadataOp>(loc, rhsSubView);
+      memref::ExtractStridedMetadataOp::create(rewriter, loc, rhsSubView);
   auto metadataAcc =
-      rewriter.create<memref::ExtractStridedMetadataOp>(loc, accBuf.memRef);
+      memref::ExtractStridedMetadataOp::create(rewriter, loc, accBuf.memRef);
 
   Value lda = metadataA.getStrides()[metadataA.getStrides().size() - 2];
   Value ldb = metadataB.getStrides()[metadataB.getStrides().size() - 2];
@@ -481,10 +481,11 @@ convertCandidate(DotOpCandidate &candidate, Ukernels ukernels,
   bool skipPacking = !isPackingRequired || candidate.rhsBuf.vnni;
   auto skipPack = int_cst(rewriter.getI1Type(), skipPacking);
 
-  Value brgemm = rewriter.create<triton::cpu::BrgemmCreate>(
-      loc, rewriter.getIndexType(), blockM, blockN, blockK, numBatches, lda,
-      ldb, ldc, lhsStepInBytes, rhsStepInBytes, op.getA().getType(),
-      op.getB().getType(), rewriter.getF32Type(), skipPack);
+  Value brgemm = triton::cpu::BrgemmCreate::create(
+      rewriter, loc, rewriter.getIndexType(), blockM, blockN, blockK,
+      numBatches, lda, ldb, ldc, lhsStepInBytes, rhsStepInBytes,
+      op.getA().getType(), op.getB().getType(), rewriter.getF32Type(),
+      skipPack);
   auto rhsTypeSize = int_cst(rewriter.getI64Type(),
                              op.getB().getType().getElementTypeBitWidth() / 8);
   Value rhsBlockSizeInBytes = op_muli(op_muli(blockN, blockK), rhsTypeSize);
@@ -503,9 +504,10 @@ convertCandidate(DotOpCandidate &candidate, Ukernels ukernels,
        << "          blockptr " << candidate.rhsBuf.origBlockPtr << "\n"
        << "        transposed " << candidate.rhsBuf.transposed << "\n} \n");
 
-  rewriter.create<triton::cpu::BrgemmExecute>(
-      loc, brgemm, lhsSubView, rhsSubView, accBuf.memRef, lhsStepInBytes,
-      rhsStepInBytes, rhsBlockSizeInBytes, numBatches, skipPack);
+  triton::cpu::BrgemmExecute::create(rewriter, loc, brgemm, lhsSubView,
+                                     rhsSubView, accBuf.memRef, lhsStepInBytes,
+                                     rhsStepInBytes, rhsBlockSizeInBytes,
+                                     numBatches, skipPack);
 
   if (candidate.isAccLoopCarried && candidate.canFuseLoop) {
     LDBG("Loading the result to a vector to replace orig op result.");
@@ -549,8 +551,9 @@ convertCandidate(DotOpCandidate &candidate, Ukernels ukernels,
     return success();
   }
   LDBG("Loading the result to a vector to replace orig op result.");
-  Value newVal = rewriter.create<vector::TransferReadOp>(
-      loc, cast<VectorType>(toFp32(resTy)), accBuf.memRef, accBuf.indices,
+  Value newVal = vector::TransferReadOp::create(
+      rewriter, loc, cast<VectorType>(toFp32(resTy)), accBuf.memRef,
+      accBuf.indices,
       arith::getZeroConstant(rewriter, loc, rewriter.getF32Type()));
   // We might need to cast back to the original type.
   newVal = maybeCast(loc, newVal, resElemTy, rewriter);

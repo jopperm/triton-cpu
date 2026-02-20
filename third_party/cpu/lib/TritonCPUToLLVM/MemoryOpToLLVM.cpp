@@ -61,18 +61,18 @@ struct ExtractMemRefOpConversion : public OpConversionPattern<ExtractMemRefOp> {
 
     auto copyValue = [&](Value to, int64_t idxFrom, int64_t idxTo) {
       auto valueTy = memRefStructFields[idxTo];
-      Value val = rewriter.create<LLVM::ExtractValueOp>(
-          loc, valueTy, tensorPtrStruct, idxFrom);
-      return rewriter.create<LLVM::InsertValueOp>(loc, memRefStructTy, to, val,
-                                                  idxTo);
+      Value val = LLVM::ExtractValueOp::create(rewriter, loc, valueTy,
+                                               tensorPtrStruct, idxFrom);
+      return LLVM::InsertValueOp::create(rewriter, loc, memRefStructTy, to, val,
+                                         idxTo);
     };
 
     Value res = b.undef(memRefStructTy);
     // Copy base.
     res = copyValue(res, 0, 1);
     // Use 0 offset.
-    res = rewriter.create<LLVM::InsertValueOp>(loc, memRefStructTy, res,
-                                               b.i64_val(0), 2);
+    res = LLVM::InsertValueOp::create(rewriter, loc, memRefStructTy, res,
+                                      b.i64_val(0), 2);
     // Copy shape.
     res = copyValue(res, 2, 3);
     // Copy strides.
@@ -99,8 +99,9 @@ struct ExtractIndicesOpConversion
     SmallVector<Value> indices;
 
     for (int64_t i = 0; i < rank; i++) {
-      indices.push_back(rewriter.create<LLVM::ExtractValueOp>(
-          loc, i64Ty, tensorPtrStruct, SmallVector<int64_t, 2>{1, i}));
+      indices.push_back(
+          LLVM::ExtractValueOp::create(rewriter, loc, i64Ty, tensorPtrStruct,
+                                       SmallVector<int64_t, 2>{1, i}));
     }
 
     rewriter.replaceOp(op, indices);
@@ -122,7 +123,7 @@ struct PtrToMemRefOpConversion : public OpConversionPattern<PtrToMemRefOp> {
 
     Value res = b.undef(memRefStructTy);
     res =
-        rewriter.create<LLVM::InsertValueOp>(loc, memRefStructTy, res, ptr, 1);
+        LLVM::InsertValueOp::create(rewriter, loc, memRefStructTy, res, ptr, 1);
     rewriter.replaceOp(op, res);
 
     return success();
@@ -145,9 +146,10 @@ struct MakeTensorPtrOpConversion : public OpConversionPattern<MakeTensorPtrOp> {
       for (int64_t i = 0; i < static_cast<int64_t>(values.size()); ++i) {
         Value val = values[i];
         if (zextTo)
-          val = rewriter.create<LLVM::ZExtOp>(loc, zextTo, val);
-        structVal = rewriter.create<LLVM::InsertValueOp>(
-            loc, structTy, structVal, val, SmallVector<int64_t, 2>{idx, i});
+          val = LLVM::ZExtOp::create(rewriter, loc, zextTo, val);
+        structVal =
+            LLVM::InsertValueOp::create(rewriter, loc, structTy, structVal, val,
+                                        SmallVector<int64_t, 2>{idx, i});
       }
       return structVal;
     };
@@ -155,7 +157,8 @@ struct MakeTensorPtrOpConversion : public OpConversionPattern<MakeTensorPtrOp> {
     Value res = b.undef(structTy);
     // 0 - base pointer.
     auto base = rewriter.getRemappedValue(op.getBase());
-    res = rewriter.create<LLVM::InsertValueOp>(loc, structTy, res, base, 0);
+    res = LLVM::InsertValueOp::create(rewriter, loc, structTy, res, base,
+                                      ArrayRef<int64_t>{0});
     // 1 - array<rank> for offsets. Promote values to i64.
     res = insertArray(res, op.getOffsets(), 1, i64Ty);
     // 2 - array<rank> for shape.
@@ -182,12 +185,12 @@ struct AdvanceOpConversion : public OpConversionPattern<AdvanceOp> {
     auto offsets = op.getOffsets();
 
     for (int64_t i = 0; i < offsets.size(); ++i) {
-      auto oldOffset = rewriter.create<LLVM::ExtractValueOp>(
-          loc, i64Ty, res, SmallVector<int64_t, 2>{1, i});
-      auto step = rewriter.create<LLVM::SExtOp>(loc, i64Ty, offsets[i]);
-      auto newOffset = rewriter.create<LLVM::AddOp>(loc, oldOffset, step);
-      res = rewriter.create<LLVM::InsertValueOp>(loc, structTy, res, newOffset,
-                                                 SmallVector<int64_t, 2>{1, i});
+      auto oldOffset = LLVM::ExtractValueOp::create(
+          rewriter, loc, i64Ty, res, SmallVector<int64_t, 2>{1, i});
+      auto step = LLVM::SExtOp::create(rewriter, loc, i64Ty, offsets[i]);
+      auto newOffset = LLVM::AddOp::create(rewriter, loc, oldOffset, step);
+      res = LLVM::InsertValueOp::create(rewriter, loc, structTy, res, newOffset,
+                                        SmallVector<int64_t, 2>{1, i});
     }
 
     rewriter.replaceOp(op, res);

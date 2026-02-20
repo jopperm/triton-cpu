@@ -54,9 +54,8 @@ struct PrintOpConversion : public OpConversionPattern<triton::PrintOp> {
     // It lowers to triton_cpu.print after converting tensor types to vectors.
     // (tt.print doesn't accept vector types, so we have this intermediate op.)
     if (op.getNumOperands() == 0) {
-      rewriter.create<triton::cpu::PrintOp>(loc, op.getPrefix(), op.getHex(),
-                                            ValueRange{},
-                                            llvm::SmallVector<int, 0>{});
+      triton::cpu::PrintOp::create(rewriter, loc, op.getPrefix(), op.getHex(),
+                                   ValueRange{}, llvm::SmallVector<int, 0>{});
       rewriter.eraseOp(op);
       return success();
     }
@@ -65,9 +64,9 @@ struct PrintOpConversion : public OpConversionPattern<triton::PrintOp> {
       Value operand = op.getOperands()[i];
       auto isSigned = {op.getIsSigned()[i]};
       if (!isa<RankedTensorType>(operand.getType())) {
-        rewriter.create<triton::cpu::PrintOp>(
-            loc, op.getPrefix(), op.getHex(),
-            rewriter.getRemappedValue(operand), isSigned);
+        triton::cpu::PrintOp::create(rewriter, loc, op.getPrefix(), op.getHex(),
+                                     rewriter.getRemappedValue(operand),
+                                     isSigned);
         continue;
       }
 
@@ -78,25 +77,25 @@ struct PrintOpConversion : public OpConversionPattern<triton::PrintOp> {
       }
       MemRefType memRefTy = MemRefType::get(tensorTy.getShape(), elemTy);
 
-      Value allocVal = rewriter.create<memref::AllocOp>(
-          loc, memRefTy, rewriter.getI64IntegerAttr(64));
+      Value allocVal = memref::AllocOp::create(rewriter, loc, memRefTy,
+                                               rewriter.getI64IntegerAttr(64));
 
       Value vec = rewriter.getRemappedValue(operand);
       VectorType vecTy = cast<VectorType>(vec.getType());
 
-      Value zeroIdx = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+      Value zeroIdx = arith::ConstantIndexOp::create(rewriter, loc, 0);
       SmallVector<Value> indices(vecTy.getRank(), zeroIdx);
 
-      rewriter.create<vector::TransferWriteOp>(loc, vec, allocVal, indices);
+      vector::TransferWriteOp::create(rewriter, loc, vec, allocVal, indices);
 
-      Value allocUnrankedVal = rewriter.create<memref::CastOp>(
-          loc, UnrankedMemRefType::get(elemTy, memRefTy.getMemorySpace()),
-          allocVal);
+      Value allocUnrankedVal = memref::CastOp::create(
+          rewriter, loc,
+          UnrankedMemRefType::get(elemTy, memRefTy.getMemorySpace()), allocVal);
 
-      rewriter.create<triton::cpu::PrintOp>(loc, op.getPrefix(), op.getHex(),
-                                            allocUnrankedVal, isSigned);
+      triton::cpu::PrintOp::create(rewriter, loc, op.getPrefix(), op.getHex(),
+                                   allocUnrankedVal, isSigned);
 
-      rewriter.create<memref::DeallocOp>(loc, allocVal);
+      memref::DeallocOp::create(rewriter, loc, allocVal);
     }
 
     rewriter.eraseOp(op);
@@ -111,13 +110,14 @@ struct AssertOpConversion : public OpConversionPattern<triton::AssertOp> {
   matchAndRewrite(triton::AssertOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
-    Value acc = rewriter.create<arith::ConstantOp>(loc, i1_ty,
-                                                   rewriter.getOneAttr(i1_ty));
+    Value acc = arith::ConstantOp::create(rewriter, loc, i1_ty,
+                                          rewriter.getOneAttr(i1_ty));
     Value condition = rewriter.getRemappedValue(op.getCondition());
     SmallVector<bool> dimsToReduce(
         cast<VectorType>(condition.getType()).getRank(), true);
-    condition = rewriter.create<vector::MultiDimReductionOp>(
-        loc, condition, acc, dimsToReduce, vector::CombiningKind::AND);
+    condition = vector::MultiDimReductionOp::create(rewriter, loc, condition,
+                                                    acc, dimsToReduce,
+                                                    vector::CombiningKind::AND);
     rewriter.replaceOpWithNewOp<triton::cpu::AssertOp>(op, condition,
                                                        op.getMessage());
     return success();

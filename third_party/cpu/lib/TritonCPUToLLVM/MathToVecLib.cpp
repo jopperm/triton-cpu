@@ -48,8 +48,8 @@ public:
     SmallVector<Value> fp32Ops;
     for (auto operand : op->getOperands())
       fp32Ops.push_back(
-          rewriter.create<arith::ExtFOp>(loc, fp32VecTy, operand));
-    auto newOp = rewriter.create<OpT>(loc, fp32VecTy, fp32Ops);
+          arith::ExtFOp::create(rewriter, loc, fp32VecTy, operand));
+    auto newOp = OpT::create(rewriter, loc, fp32VecTy, fp32Ops);
     rewriter.replaceOpWithNewOp<arith::TruncFOp>(op, vecTy, newOp);
     return success();
   }
@@ -110,15 +110,16 @@ public:
       auto operandTy = cast<VectorType>(operand.getType());
       auto newOperandTy = VectorType::get(newShape, operandTy.getElementType());
       reshapedInputs.push_back(
-          rewriter.create<vector::ShapeCastOp>(loc, newOperandTy, operand));
+          vector::ShapeCastOp::create(rewriter, loc, newOperandTy, operand));
     }
 
     // Decompose the original operation to a set of operations on native
     // vectors.
     auto newOpTy = VectorType::get(newShape, elemTy);
     auto subResTy = VectorType::get(newShape.back(), elemTy);
-    Value newRes = rewriter.create<arith::ConstantOp>(
-        loc, SplatElementsAttr::get(newOpTy, rewriter.getFloatAttr(elemTy, 0)));
+    Value newRes = arith::ConstantOp::create(
+        rewriter, loc,
+        SplatElementsAttr::get(newOpTy, rewriter.getFloatAttr(elemTy, 0)));
     auto strides = computeStrides(newShape);
     // Remove the last stride to produce sub-vector indices.
     strides.pop_back();
@@ -127,12 +128,12 @@ public:
       SmallVector<Value> subInputs(reshapedInputs.size());
       std::transform(reshapedInputs.begin(), reshapedInputs.end(),
                      subInputs.begin(), [&](auto val) {
-                       return rewriter.create<vector::ExtractOp>(loc, val,
-                                                                 indices);
+                       return vector::ExtractOp::create(rewriter, loc, val,
+                                                        indices);
                      });
       Value subRes =
-          rewriter.create<OpT>(loc, subResTy, subInputs, op->getAttrs());
-      newRes = rewriter.create<vector::InsertOp>(loc, subRes, newRes, indices);
+          OpT::create(rewriter, loc, subResTy, subInputs, op->getAttrs());
+      newRes = vector::InsertOp::create(rewriter, loc, subRes, newRes, indices);
     }
 
     // Reshape the result back to the original type.
@@ -171,8 +172,8 @@ public:
       return failure();
 
     // Create a single-element vector for shuffle to use
-    auto paddingVec = rewriter.create<vector::SplatOp>(
-        loc, b.undef(elemTy), VectorType::get({1}, elemTy));
+    auto paddingVec = vector::BroadcastOp::create(
+        rewriter, loc, VectorType::get({1}, elemTy), b.undef(elemTy));
     // Assign indices such that shuffle will pad the original vector with
     // elements from the paddingVec
     SmallVector<int64_t> indices(4);
@@ -185,13 +186,13 @@ public:
     SmallVector<Value> newOperands;
     for (auto argVal : op.getOperands()) {
       auto shuf =
-          rewriter.create<vector::ShuffleOp>(loc, argVal, paddingVec, indices);
+          vector::ShuffleOp::create(rewriter, loc, argVal, paddingVec, indices);
       newOperands.push_back(shuf.getResult());
     }
     // Update return type of extern call
     auto newVecTy = VectorType::get({4}, elemTy);
-    auto extern_elem = rewriter.create<ExternElementwiseOp>(
-        loc, newVecTy, newOperands, op.getSymbol(), op.getPure());
+    auto extern_elem = ExternElementwiseOp::create(
+        rewriter, loc, newVecTy, newOperands, op.getSymbol(), op.getPure());
     indices.resize(numElems);
     // Truncate result to original size
     rewriter.replaceOpWithNewOp<vector::ShuffleOp>(op, extern_elem.getResult(),
@@ -288,8 +289,8 @@ public:
       rewriter.setInsertionPointToStart(&module->getRegion(0).front());
       auto fnTy = FunctionType::get(
           rewriter.getContext(), op->getOperandTypes(), op->getResultTypes());
-      opFunc =
-          rewriter.create<func::FuncOp>(rewriter.getUnknownLoc(), fnName, fnTy);
+      opFunc = func::FuncOp::create(rewriter, rewriter.getUnknownLoc(), fnName,
+                                    fnTy);
       opFunc.setPrivate();
       opFunc->setAttr(LLVM::LLVMDialect::getReadnoneAttrName(),
                       UnitAttr::get(rewriter.getContext()));

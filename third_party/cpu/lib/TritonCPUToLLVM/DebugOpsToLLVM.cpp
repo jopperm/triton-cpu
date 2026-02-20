@@ -111,8 +111,8 @@ LLVM::LLVMFuncOp getOrAddPrintFuncDecl(ConversionPatternRewriter &rewriter,
   ConversionPatternRewriter::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToStart(moduleOp.getBody());
 
-  return rewriter.create<LLVM::LLVMFuncOp>(UnknownLoc::get(ctx), funcName,
-                                           funcType);
+  return LLVM::LLVMFuncOp::create(rewriter, UnknownLoc::get(ctx), funcName,
+                                  funcType);
 }
 
 LLVM::LLVMFuncOp
@@ -146,8 +146,8 @@ getOrAddPrintMemrefFuncDecl(ConversionPatternRewriter &rewriter) {
   ConversionPatternRewriter::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToStart(moduleOp.getBody());
 
-  return rewriter.create<LLVM::LLVMFuncOp>(UnknownLoc::get(ctx), funcName,
-                                           funcType);
+  return LLVM::LLVMFuncOp::create(rewriter, UnknownLoc::get(ctx), funcName,
+                                  funcType);
 }
 
 static StringRef makeNullTerminatedString(StringRef s) {
@@ -320,8 +320,8 @@ struct AssertOpConversion
     ConversionPatternRewriter::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(moduleOp.getBody());
 
-    return rewriter.create<LLVM::LLVMFuncOp>(UnknownLoc::get(ctx), funcName,
-                                             funcType);
+    return LLVM::LLVMFuncOp::create(rewriter, UnknownLoc::get(ctx), funcName,
+                                    funcType);
   }
 };
 

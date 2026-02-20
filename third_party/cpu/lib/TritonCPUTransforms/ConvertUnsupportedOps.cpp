@@ -38,8 +38,8 @@ struct ConvertBf16ToFp32 : public OpRewritePattern<OpT> {
     OperationState newState(loc, OpT::getOperationName());
     // Convert operands to fp32 and generate fp32 op.
     for (auto operand : op->getOperands()) {
-      Value newOperand = rewriter.create<arith::ExtFOp>(
-          loc, toFp32(operand.getType()), operand);
+      Value newOperand = arith::ExtFOp::create(
+          rewriter, loc, toFp32(operand.getType()), operand);
       newState.operands.push_back(newOperand);
     }
     newState.types = toFp32(op->getResultTypes());
@@ -49,8 +49,8 @@ struct ConvertBf16ToFp32 : public OpRewritePattern<OpT> {
     // Convert op results back to Bf16
     SmallVector<Value> results;
     for (auto res : llvm::enumerate(newOp->getResults()))
-      results.push_back(rewriter.create<arith::TruncFOp>(
-          loc, op->getResult(res.index()).getType(), res.value()));
+      results.push_back(arith::TruncFOp::create(
+          rewriter, loc, op->getResult(res.index()).getType(), res.value()));
     rewriter.replaceOp(op, results);
 
     return success();
@@ -80,8 +80,8 @@ struct ConvertIToBf16ToFp32 : public OpRewritePattern<OpT> {
 
     Location loc = op.getLoc();
     Value fp32Val =
-        rewriter.create<OpT>(loc, toFp32(op.getType()), op.getOperand());
-    Value res = rewriter.create<arith::TruncFOp>(loc, op.getType(), fp32Val);
+        OpT::create(rewriter, loc, toFp32(op.getType()), op.getOperand());
+    Value res = arith::TruncFOp::create(rewriter, loc, op.getType(), fp32Val);
     rewriter.replaceOp(op, res);
     return success();
   }
@@ -101,16 +101,16 @@ Value convertMemRefToI16(Value memRef, PatternRewriter &rewriter) {
   // Memory references for masked operations and transfers are always built
   // with PtrToMemRefOp, ExtractMemRefOp, or memref::AllocaOp.
   if (auto castOp = memRef.getDefiningOp<PtrToMemRefOp>()) {
-    res = rewriter.create<PtrToMemRefOp>(memRef.getLoc(), newMemRefTy,
-                                         castOp.getSrc());
+    res = PtrToMemRefOp::create(rewriter, memRef.getLoc(), newMemRefTy,
+                                castOp.getSrc());
   } else if (auto extractOp = memRef.getDefiningOp<ExtractMemRefOp>()) {
-    res = rewriter.create<ExtractMemRefOp>(memRef.getLoc(), newMemRefTy,
-                                           extractOp.getSrc());
+    res = ExtractMemRefOp::create(rewriter, memRef.getLoc(), newMemRefTy,
+                                  extractOp.getSrc());
   } else {
     auto allocaOp = memRef.getDefiningOp<memref::AllocaOp>();
     assert(allocaOp && "Unexpected memref producer");
-    res = rewriter.create<memref::AllocaOp>(allocaOp.getLoc(), newMemRefTy,
-                                            allocaOp.getAlignmentAttr());
+    res = memref::AllocaOp::create(rewriter, allocaOp.getLoc(), newMemRefTy,
+                                   allocaOp.getAlignmentAttr());
     rewriter.replaceOp(allocaOp, res);
   }
   rewriter.restoreInsertionPoint(insPoint);
@@ -127,12 +127,12 @@ struct ConvertBf16MaskedLoadOp : public OpRewritePattern<vector::MaskedLoadOp> {
 
     Location loc = op.getLoc();
     Value newBase = convertMemRefToI16(op.getBase(), rewriter);
-    Value newPassThru = rewriter.create<arith::BitcastOp>(
-        loc, toInt16(op.getPassThru().getType()), op.getPassThru());
-    Value intVal = rewriter.create<vector::MaskedLoadOp>(
-        loc, toInt16(op.getType()), newBase, op.getIndices(), op.getMask(),
-        newPassThru);
-    Value res = rewriter.create<arith::BitcastOp>(loc, op.getType(), intVal);
+    Value newPassThru = arith::BitcastOp::create(
+        rewriter, loc, toInt16(op.getPassThru().getType()), op.getPassThru());
+    Value intVal = vector::MaskedLoadOp::create(
+        rewriter, loc, toInt16(op.getType()), newBase, op.getIndices(),
+        op.getMask(), newPassThru);
+    Value res = arith::BitcastOp::create(rewriter, loc, op.getType(), intVal);
     rewriter.replaceOp(op, res);
     return success();
   }
@@ -149,8 +149,9 @@ struct ConvertBf16MaskedStoreOp
 
     Location loc = op.getLoc();
     Value newBase = convertMemRefToI16(op.getBase(), rewriter);
-    Value intVal = rewriter.create<arith::BitcastOp>(
-        loc, toInt16(op.getValueToStore().getType()), op.getValueToStore());
+    Value intVal = arith::BitcastOp::create(
+        rewriter, loc, toInt16(op.getValueToStore().getType()),
+        op.getValueToStore());
     rewriter.replaceOpWithNewOp<vector::MaskedStoreOp>(
         op, newBase, op.getIndices(), op.getMask(), intVal);
     return success();
@@ -170,14 +171,15 @@ struct ConvertBf16TransferReadOp
     Value newSource = convertMemRefToI16(op.getBase(), rewriter);
     Value newPadding =
         op.getPadding()
-            ? rewriter.create<arith::BitcastOp>(
-                  loc, toInt16(op.getPadding().getType()), op.getPadding())
+            ? arith::BitcastOp::create(rewriter, loc,
+                                       toInt16(op.getPadding().getType()),
+                                       op.getPadding())
             : nullptr;
-    Value intVal = rewriter.create<vector::TransferReadOp>(
-        loc, toInt16(op.getType()), newSource, op.getIndices(),
+    Value intVal = vector::TransferReadOp::create(
+        rewriter, loc, toInt16(op.getType()), newSource, op.getIndices(),
         op.getPermutationMapAttr(), newPadding, op.getMask(),
         op.getInBoundsAttr());
-    Value res = rewriter.create<arith::BitcastOp>(loc, op.getType(), intVal);
+    Value res = arith::BitcastOp::create(rewriter, loc, op.getType(), intVal);
     rewriter.replaceOp(op, res);
     return success();
   }
@@ -194,8 +196,8 @@ struct ConvertBf16TransferWriteOp
 
     Location loc = op.getLoc();
     Value newSource = convertMemRefToI16(op.getBase(), rewriter);
-    Value intVal = rewriter.create<arith::BitcastOp>(
-        loc, toInt16(op.getVector().getType()), op.getVector());
+    Value intVal = arith::BitcastOp::create(
+        rewriter, loc, toInt16(op.getVector().getType()), op.getVector());
     rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
         op, intVal, newSource, op.getIndices(), op.getPermutationMapAttr(),
         op.getMask(), op.getInBoundsAttr());
@@ -214,8 +216,8 @@ struct ConvertBf16LoadOp : public OpRewritePattern<memref::LoadOp> {
     Location loc = op.getLoc();
     Value newMemRef = convertMemRefToI16(op.getMemRef(), rewriter);
     Value intVal =
-        rewriter.create<memref::LoadOp>(loc, newMemRef, op.getIndices());
-    Value res = rewriter.create<arith::BitcastOp>(loc, op.getType(), intVal);
+        memref::LoadOp::create(rewriter, loc, newMemRef, op.getIndices());
+    Value res = arith::BitcastOp::create(rewriter, loc, op.getType(), intVal);
     rewriter.replaceOp(op, res);
     return success();
   }
@@ -231,8 +233,8 @@ struct ConvertBf16StoreOp : public OpRewritePattern<memref::StoreOp> {
 
     Location loc = op.getLoc();
     Value newMemRef = convertMemRefToI16(op.getMemRef(), rewriter);
-    Value intVal = rewriter.create<arith::BitcastOp>(
-        loc, toInt16(op.getValue().getType()), op.getValue());
+    Value intVal = arith::BitcastOp::create(
+        rewriter, loc, toInt16(op.getValue().getType()), op.getValue());
     rewriter.replaceOpWithNewOp<memref::StoreOp>(op, intVal, newMemRef,
                                                  op.getIndices());
     return success();
@@ -250,13 +252,13 @@ struct ConvertBf16Abs : public OpRewritePattern<math::AbsFOp> {
     Location loc = op.getLoc();
     Value src = op.getOperand();
     Value intSrc =
-        rewriter.create<arith::BitcastOp>(loc, toInt16(op.getType()), src);
+        arith::BitcastOp::create(rewriter, loc, toInt16(op.getType()), src);
     TypedAttr maskAttr = rewriter.getI16IntegerAttr(0x7fff);
     if (auto vecTy = dyn_cast<VectorType>(intSrc.getType()))
       maskAttr = SplatElementsAttr::get(vecTy, maskAttr);
-    Value mask = rewriter.create<arith::ConstantOp>(loc, maskAttr);
-    Value res = rewriter.create<arith::AndIOp>(loc, intSrc, mask);
-    res = rewriter.create<arith::BitcastOp>(loc, op.getType(), res);
+    Value mask = arith::ConstantOp::create(rewriter, loc, maskAttr);
+    Value res = arith::AndIOp::create(rewriter, loc, intSrc, mask);
+    res = arith::BitcastOp::create(rewriter, loc, op.getType(), res);
     rewriter.replaceOp(op, res);
     return success();
   }
@@ -316,8 +318,9 @@ struct ConvertMixedPrecisionMatmul
     rhs = castElemTy(loc, rhs, commonElemTy, rewriter);
     acc = castElemTy(loc, acc, commonElemTy, rewriter);
 
-    Value newRes = rewriter.create<vector::ContractionOp>(
-        loc, lhs, rhs, acc, op.getIndexingMaps(), op.getIteratorTypes());
+    Value newRes = vector::ContractionOp::create(rewriter, loc, lhs, rhs, acc,
+                                                 op.getIndexingMaps(),
+                                                 op.getIteratorTypes());
     newRes = castElemTy(loc, newRes, resTy.getElementType(), rewriter);
 
     rewriter.replaceOp(op, newRes);
@@ -333,14 +336,14 @@ struct ConvertMixedPrecisionMatmul
     auto resTy = toTyOrVectorOf(valTy, elemTy);
     if (valTy.getElementType().isInteger()) {
       if (valTy.getElementTypeBitWidth() > elemTy.getIntOrFloatBitWidth())
-        return rewriter.create<arith::TruncIOp>(loc, resTy, val);
+        return arith::TruncIOp::create(rewriter, loc, resTy, val);
       else
-        return rewriter.create<arith::ExtSIOp>(loc, resTy, val);
+        return arith::ExtSIOp::create(rewriter, loc, resTy, val);
     } else {
       if (valTy.getElementTypeBitWidth() > elemTy.getIntOrFloatBitWidth())
-        return rewriter.create<arith::TruncFOp>(loc, resTy, val);
+        return arith::TruncFOp::create(rewriter, loc, resTy, val);
       else
-        return rewriter.create<arith::ExtFOp>(loc, resTy, val);
+        return arith::ExtFOp::create(rewriter, loc, resTy, val);
     }
   }
 };
@@ -361,8 +364,8 @@ public:
     Type fp32Ty = toFp32(opTy);
     SmallVector<Value> fp32Ops;
     for (auto operand : op->getOperands())
-      fp32Ops.push_back(rewriter.create<arith::ExtFOp>(loc, fp32Ty, operand));
-    auto newOp = rewriter.create<OpT>(loc, fp32Ty, fp32Ops);
+      fp32Ops.push_back(arith::ExtFOp::create(rewriter, loc, fp32Ty, operand));
+    auto newOp = OpT::create(rewriter, loc, fp32Ty, fp32Ops);
     rewriter.replaceOpWithNewOp<arith::TruncFOp>(op, opTy, newOp);
     return success();
   }

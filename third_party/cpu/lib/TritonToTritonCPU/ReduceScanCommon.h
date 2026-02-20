@@ -80,13 +80,13 @@ struct ReduceScanOpConversionBase : public OpConversionPattern<OpT> {
       SmallVector<Value> subInputs(inputs.size());
       std::transform(
           inputs.begin(), inputs.end(), subInputs.begin(), [&](auto val) {
-            return rewriter.create<vector::ExtractOp>(loc, val, indices);
+            return vector::ExtractOp::create(rewriter, loc, val, indices);
           });
 
       auto resElems = lower1DInput(subInputs, op, rewriter);
       for (size_t i = 0; i < res.size(); ++i) {
-        res[i] = rewriter.create<vector::InsertOp>(loc, resElems[i], res[i],
-                                                   indices);
+        res[i] = vector::InsertOp::create(rewriter, loc, resElems[i], res[i],
+                                          indices);
       }
     }
 
@@ -124,12 +124,12 @@ struct ReduceScanOpConversionBase : public OpConversionPattern<OpT> {
       SmallVector<Value> subInputs(inputs.size());
       std::transform(
           inputs.begin(), inputs.end(), subInputs.begin(), [&](auto val) {
-            return rewriter.create<vector::ExtractOp>(loc, val, indices);
+            return vector::ExtractOp::create(rewriter, loc, val, indices);
           });
       auto resVecs = lowerLeadingDimension(subInputs, op, rewriter);
       for (size_t i = 0; i < res.size(); ++i) {
-        res[i] =
-            rewriter.create<vector::InsertOp>(loc, resVecs[i], res[i], indices);
+        res[i] = vector::InsertOp::create(rewriter, loc, resVecs[i], res[i],
+                                          indices);
       }
     }
 
@@ -198,8 +198,8 @@ struct ReduceScanOpConversionBase : public OpConversionPattern<OpT> {
       if (!res) {
         auto ip = rewriter.saveInsertionPoint();
         rewriter.setInsertionPointAfterValue(val);
-        res = rewriter.create<vector::SplatOp>(
-            val.getLoc(), VectorType::get(shape, val.getType()), val);
+        res = vector::BroadcastOp::create(
+            rewriter, val.getLoc(), VectorType::get(shape, val.getType()), val);
         invariantsMap.map(val, res);
         rewriter.restoreInsertionPoint(ip);
       }
@@ -213,8 +213,9 @@ struct ReduceScanOpConversionBase : public OpConversionPattern<OpT> {
     // Initialize results to zero values.
     SmallVector<Value> res;
     for (auto ty : resTypes) {
-      res.push_back(rewriter.create<arith::ConstantOp>(
-          loc, rewriter.getZeroAttr(getTypeConverter()->convertType(ty))));
+      res.push_back(arith::ConstantOp::create(
+          rewriter, loc,
+          rewriter.getZeroAttr(getTypeConverter()->convertType(ty))));
     }
     return res;
   }
@@ -228,8 +229,8 @@ struct ReduceScanOpConversionBase : public OpConversionPattern<OpT> {
     SmallVector<int64_t, 1> dummyShape({1});
     for (auto val : inputs) {
       auto ty = cast<VectorType>(val.getType());
-      shuffleDummies.push_back(rewriter.create<arith::ConstantOp>(
-          loc,
+      shuffleDummies.push_back(arith::ConstantOp::create(
+          rewriter, loc,
           rewriter.getZeroAttr(ty.cloneWith(dummyShape, ty.getElementType()))));
     }
     return shuffleDummies;

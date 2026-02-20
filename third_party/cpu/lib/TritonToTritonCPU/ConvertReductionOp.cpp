@@ -83,8 +83,8 @@ struct ReduceOpConversion
       }
       SmallVector<Value> shuffledInput;
       for (auto [val, dummy] : llvm::zip(res, dummies)) {
-        shuffledInput.push_back(rewriter.create<vector::ShuffleOp>(
-            loc, val, dummy, shuffleIndices));
+        shuffledInput.push_back(vector::ShuffleOp::create(
+            rewriter, loc, val, dummy, shuffleIndices));
       }
 
       res = accumulate(shuffledInput, res, combineOp, rewriter);
@@ -92,9 +92,9 @@ struct ReduceOpConversion
 
     // The results are in the first element of each produced vector.
     Value zero =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(0));
+        arith::ConstantOp::create(rewriter, loc, rewriter.getIndexAttr(0));
     for (size_t i = 0; i < res.size(); ++i) {
-      res[i] = rewriter.create<vector::ExtractOp>(loc, res[i], zero);
+      res[i] = vector::ExtractOp::create(rewriter, loc, res[i], zero);
     }
     return res;
   }
@@ -108,10 +108,10 @@ struct ReduceOpConversion
     SmallVector<Value> res;
     for (int64_t idx = 0; idx < shape[0]; ++idx) {
       SmallVector<Value> subInputs(inputs.size());
-      std::transform(inputs.begin(), inputs.end(), subInputs.begin(),
-                     [&](auto val) {
-                       return rewriter.create<vector::ExtractOp>(loc, val, idx);
-                     });
+      std::transform(
+          inputs.begin(), inputs.end(), subInputs.begin(), [&](auto val) {
+            return vector::ExtractOp::create(rewriter, loc, val, idx);
+          });
 
       res = accumulate(subInputs, res, combineOp, rewriter);
     }
@@ -265,7 +265,7 @@ struct ReduceOpConversion
     if (vecTy)
       initVal = SplatElementsAttr::get(vecTy, initVal);
 
-    return rewriter.create<arith::ConstantOp>(loc, resTy, initVal);
+    return arith::ConstantOp::create(rewriter, loc, resTy, initVal);
   }
 
 private:

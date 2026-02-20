@@ -73,31 +73,31 @@ struct AtomicRMWOpConversion : public OpConversionPattern<triton::AtomicRMWOp> {
     auto vecTy = cast<VectorType>(vals.getType());
     auto strides = computeStrides(vecTy.getShape());
     Value res =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getZeroAttr(vecTy));
+        arith::ConstantOp::create(rewriter, loc, rewriter.getZeroAttr(vecTy));
     int64_t numElems = vecTy.getNumElements();
     for (int64_t idx = 0; idx < numElems; ++idx) {
       auto indices = delinearize(idx, strides);
-      Value ptr = rewriter.create<vector::ExtractOp>(loc, ptrs, indices);
-      ptr = rewriter.create<IntToPtrOp>(loc, ptrTy, ptr);
-      Value val = rewriter.create<vector::ExtractOp>(loc, vals, indices);
+      Value ptr = vector::ExtractOp::create(rewriter, loc, ptrs, indices);
+      ptr = IntToPtrOp::create(rewriter, loc, ptrTy, ptr);
+      Value val = vector::ExtractOp::create(rewriter, loc, vals, indices);
       Value resElem;
 
       if (mask && !maskCst) {
         // Non-const mask values are lowered to CF.
-        Value maskVal = rewriter.create<vector::ExtractOp>(loc, mask, indices);
+        Value maskVal = vector::ExtractOp::create(rewriter, loc, mask, indices);
         resElem = lowerScalarMaskToCF(loc, rmwOp, ptr, val, maskVal, sem, scope,
                                       rewriter);
       } else if (!mask ||
                  (maskCst && cast<DenseElementsAttr>(maskCst.getValue())
                                  .getValues<bool>()[idx])) {
         // Const true mask case.
-        resElem = rewriter.create<triton::AtomicRMWOp>(
-            loc, val.getType(), rmwOp, ptr, val, nullptr, sem, scope);
+        resElem = triton::AtomicRMWOp::create(
+            rewriter, loc, val.getType(), rmwOp, ptr, val, nullptr, sem, scope);
       }
 
       // Elements with const false mask are skipped.
       if (resElem) {
-        res = rewriter.create<vector::InsertOp>(loc, resElem, res, indices);
+        res = vector::InsertOp::create(rewriter, loc, resElem, res, indices);
       }
     }
 
@@ -112,25 +112,26 @@ struct AtomicRMWOpConversion : public OpConversionPattern<triton::AtomicRMWOp> {
     if (auto maskDef = mask.getDefiningOp<arith::ConstantOp>()) {
       auto maskVal = cast<IntegerAttr>(maskDef.getValue());
       if (maskVal.getValue().isZero()) {
-        return rewriter.create<arith::ConstantOp>(
-            loc, rewriter.getZeroAttr(val.getType()));
+        return arith::ConstantOp::create(rewriter, loc,
+                                         rewriter.getZeroAttr(val.getType()));
       } else {
-        return rewriter.create<triton::AtomicRMWOp>(
-            loc, val.getType(), rmwOp, ptr, val, nullptr, sem, scope);
+        return triton::AtomicRMWOp::create(rewriter, loc, val.getType(), rmwOp,
+                                           ptr, val, nullptr, sem, scope);
       }
     }
 
-    auto ifOp = rewriter.create<scf::IfOp>(
-        loc, mask,
+    auto ifOp = scf::IfOp::create(
+        rewriter, loc, mask,
         [&](OpBuilder &builder, Location loc) {
-          Value resVal = rewriter.create<triton::AtomicRMWOp>(
-              loc, val.getType(), rmwOp, ptr, val, nullptr, sem, scope);
-          rewriter.create<scf::YieldOp>(loc, resVal);
+          Value resVal =
+              triton::AtomicRMWOp::create(rewriter, loc, val.getType(), rmwOp,
+                                          ptr, val, nullptr, sem, scope);
+          scf::YieldOp::create(rewriter, loc, resVal);
         },
         [&](OpBuilder &builder, Location loc) {
-          Value zero = rewriter.create<arith::ConstantOp>(
-              loc, rewriter.getZeroAttr(val.getType()));
-          rewriter.create<scf::YieldOp>(loc, zero);
+          Value zero = arith::ConstantOp::create(
+              rewriter, loc, rewriter.getZeroAttr(val.getType()));
+          scf::YieldOp::create(rewriter, loc, zero);
         });
     return ifOp.getResult(0);
   }
@@ -158,17 +159,17 @@ struct AtomicCASOpConversion : public OpConversionPattern<triton::AtomicCASOp> {
     auto vecTy = cast<VectorType>(vals.getType());
     auto strides = computeStrides(vecTy.getShape());
     auto res =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getZeroAttr(vecTy));
+        arith::ConstantOp::create(rewriter, loc, rewriter.getZeroAttr(vecTy));
     int64_t numElems = vecTy.getNumElements();
     for (int64_t idx = 0; idx < numElems; ++idx) {
       auto indices = delinearize(idx, strides);
-      Value ptr = rewriter.create<vector::ExtractOp>(loc, ptrs, indices);
-      ptr = rewriter.create<IntToPtrOp>(loc, ptrTy, ptr);
-      Value val = rewriter.create<vector::ExtractOp>(loc, vals, indices);
-      Value cmpVal = rewriter.create<vector::ExtractOp>(loc, cmpVals, indices);
-      Value resElem = rewriter.create<triton::AtomicCASOp>(
-          loc, val.getType(), ptr, cmpVal, val, sem, scope);
-      rewriter.create<vector::InsertOp>(loc, resElem, res, indices);
+      Value ptr = vector::ExtractOp::create(rewriter, loc, ptrs, indices);
+      ptr = IntToPtrOp::create(rewriter, loc, ptrTy, ptr);
+      Value val = vector::ExtractOp::create(rewriter, loc, vals, indices);
+      Value cmpVal = vector::ExtractOp::create(rewriter, loc, cmpVals, indices);
+      Value resElem = triton::AtomicCASOp::create(rewriter, loc, val.getType(),
+                                                  ptr, cmpVal, val, sem, scope);
+      vector::InsertOp::create(rewriter, loc, resElem, res, indices);
     }
 
     rewriter.replaceOp(op, res);

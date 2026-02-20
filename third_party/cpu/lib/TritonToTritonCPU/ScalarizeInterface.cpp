@@ -60,7 +60,7 @@ int64_t createZeroIndex(mlir::Location loc, PatternRewriter &rewriter) {
 
 template <>
 Value createZeroIndex(mlir::Location loc, PatternRewriter &rewriter) {
-  return rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  return arith::ConstantIndexOp::create(rewriter, loc, 0);
 }
 
 } // namespace detail
@@ -152,8 +152,8 @@ struct TritonOpScalarizeInterface<MakeRangeOp>
     int32_t start = static_cast<int32_t>(def.getStart());
     assert(indices.size() == 1);
     Type elemTy = cast<RankedTensorType>(def.getType()).getElementType();
-    return rewriter.create<arith::ConstantOp>(
-        def.getLoc(), elemTy,
+    return arith::ConstantOp::create(
+        rewriter, def.getLoc(), elemTy,
         rewriter.getIntegerAttr(elemTy, start + indices[0]));
   }
 
@@ -163,14 +163,14 @@ struct TritonOpScalarizeInterface<MakeRangeOp>
     assert(indices.size() == 1);
     int32_t start = static_cast<int32_t>(def.getStart());
     Type elemTy = cast<RankedTensorType>(def.getType()).getElementType();
-    Value startVal = rewriter.create<arith::ConstantOp>(
-        def.getLoc(), elemTy, rewriter.getIntegerAttr(elemTy, start));
+    Value startVal = arith::ConstantOp::create(
+        rewriter, def.getLoc(), elemTy, rewriter.getIntegerAttr(elemTy, start));
     Value index = indices[0];
     if (!elemTy.isIndex())
       index =
-          rewriter.create<arith::IndexCastUIOp>(def.getLoc(), elemTy, index);
-    return rewriter.create<arith::AddIOp>(def.getLoc(), elemTy, startVal,
-                                          index);
+          arith::IndexCastUIOp::create(rewriter, def.getLoc(), elemTy, index);
+    return arith::AddIOp::create(rewriter, def.getLoc(), elemTy, startVal,
+                                 index);
   }
 };
 
@@ -218,8 +218,8 @@ template <> struct ScalariztionFunctor<arith::ConstantOp> {
     auto denseVal = cast<DenseElementsAttr>(def.getValue());
     assert(denseVal.isSplat());
     auto scalarAttr = denseVal.getSplatValue<TypedAttr>();
-    Value res = rewriter.create<arith::ConstantOp>(
-        def.getLoc(), scalarAttr.getType(), scalarAttr);
+    Value res = arith::ConstantOp::create(rewriter, def.getLoc(),
+                                          scalarAttr.getType(), scalarAttr);
     return res;
   }
 };

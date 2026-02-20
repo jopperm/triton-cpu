@@ -41,8 +41,8 @@ struct ScalarizeOpConversion : public OpRewritePattern<OpTy> {
                      PatternRewriter &rewriter) const {
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(before);
-    return rewriter.create<memref::AllocaOp>(
-        loc, ty, rewriter.getIntegerAttr(rewriter.getI64Type(), 64));
+    return memref::AllocaOp::create(
+        rewriter, loc, ty, rewriter.getIntegerAttr(rewriter.getI64Type(), 64));
   }
 
   // If tensor is not null and its element cannot be recomputed in a scalar
@@ -65,8 +65,8 @@ struct ScalarizeOpConversion : public OpRewritePattern<OpTy> {
     // but vector store (through transfer write) would write 1 bit per element.
     if (elemTy.isInteger(1)) {
       elemTy = rewriter.getI8Type();
-      tensor = rewriter.create<arith::ExtUIOp>(
-          loc,
+      tensor = arith::ExtUIOp::create(
+          rewriter, loc,
           RankedTensorType::get(tensorTy.getShape(), elemTy,
                                 tensorTy.getEncoding()),
           tensor);
@@ -74,7 +74,7 @@ struct ScalarizeOpConversion : public OpRewritePattern<OpTy> {
     auto memRefTy = MemRefType::get(tensorTy.getShape(), elemTy);
     Value memRef = createAlloca(vals.getLoc(), memRefTy, allocaPoint, rewriter);
     SmallVector<Value> indices(tensorTy.getRank(), zeroIdx);
-    rewriter.create<triton::cpu::StoreOp>(vals.getLoc(), tensor, memRef);
+    triton::cpu::StoreOp::create(rewriter, vals.getLoc(), tensor, memRef);
     return memRef;
   }
 
@@ -100,16 +100,16 @@ struct ScalarizeOpConversion : public OpRewritePattern<OpTy> {
 
     // Load value from a temp buffer if any.
     Value val =
-        rewriter.create<memref::LoadOp>(vals.getLoc(), tmpVals, indices);
+        memref::LoadOp::create(rewriter, vals.getLoc(), tmpVals, indices);
     // If we load a pointer then additional cast is needed because tensor of
     // pointers is transformed into a vector of integers.
     auto elemTy = dyn_cast<RankedTensorType>(vals.getType()).getElementType();
     if (isa<PointerType>(elemTy))
-      val = rewriter.create<IntToPtrOp>(vals.getLoc(), elemTy, val);
+      val = IntToPtrOp::create(rewriter, vals.getLoc(), elemTy, val);
     // We need to transform loaded i8 back to i1.
     else if (elemTy.isInteger(1))
-      val = rewriter.create<arith::TruncIOp>(val.getLoc(), rewriter.getI1Type(),
-                                             val);
+      val = arith::TruncIOp::create(rewriter, val.getLoc(),
+                                    rewriter.getI1Type(), val);
     return val;
   }
 
@@ -185,8 +185,8 @@ LogicalResult ScalarizeOpConversion<triton::StoreOp>::scalarizeWithLoop(
   auto tensorTy = cast<RankedTensorType>(vals.getType());
 
   // Create some reused constants.
-  Value zeroIdx = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  Value oneIdx = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  Value zeroIdx = arith::ConstantIndexOp::create(rewriter, loc, 0);
+  Value oneIdx = arith::ConstantIndexOp::create(rewriter, loc, 1);
 
   // Alloca is inserted similar to the load case.
   Operation *allocaPoint = storeOp;
@@ -207,8 +207,8 @@ LogicalResult ScalarizeOpConversion<triton::StoreOp>::scalarizeWithLoop(
   SmallVector<Value> ivs;
   for (int64_t i = 0; i < tensorTy.getRank(); ++i) {
     Value upperBound =
-        rewriter.create<arith::ConstantIndexOp>(loc, tensorTy.getShape()[i]);
-    auto forOp = rewriter.create<scf::ForOp>(loc, zeroIdx, upperBound, oneIdx);
+        arith::ConstantIndexOp::create(rewriter, loc, tensorTy.getShape()[i]);
+    auto forOp = scf::ForOp::create(rewriter, loc, zeroIdx, upperBound, oneIdx);
     forOps.push_back(forOp);
     ivs.push_back(forOp.getInductionVar());
     rewriter.setInsertionPointToStart(forOp.getBody());
@@ -221,16 +221,16 @@ LogicalResult ScalarizeOpConversion<triton::StoreOp>::scalarizeWithLoop(
 
   if (!mask) {
     // Regular store case.
-    auto store_op = rewriter.create<triton::StoreOp>(loc, scalarPtr, scalarVal,
-                                                     cache, evict);
+    auto store_op = triton::StoreOp::create(rewriter, loc, scalarPtr, scalarVal,
+                                            cache, evict);
   } else {
     // Conditional store case
-    rewriter.create<scf::IfOp>(loc, scalarMask,
-                               [&](OpBuilder &builder, Location loc) {
-                                 builder.create<triton::StoreOp>(
-                                     loc, scalarPtr, scalarVal, cache, evict);
-                                 builder.create<scf::YieldOp>(loc);
-                               });
+    scf::IfOp::create(rewriter, loc, scalarMask,
+                      [&](OpBuilder &builder, Location loc) {
+                        triton::StoreOp::create(builder, loc, scalarPtr,
+                                                scalarVal, cache, evict);
+                        scf::YieldOp::create(builder, loc);
+                      });
   }
 
   rewriter.eraseOp(storeOp);
@@ -263,8 +263,8 @@ LogicalResult ScalarizeOpConversion<triton::LoadOp>::scalarizeWithLoop(
   auto isVolatile = loadOp.getIsVolatile();
 
   // Create some reused constants.
-  Value zeroIdx = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  Value oneIdx = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  Value zeroIdx = arith::ConstantIndexOp::create(rewriter, loc, 0);
+  Value oneIdx = arith::ConstantIndexOp::create(rewriter, loc, 1);
 
   // There is alloca_scope operation to control alloca scopes. But its usage
   // in combination with nested SCF and multi-dimensional vectors make it
@@ -282,7 +282,7 @@ LogicalResult ScalarizeOpConversion<triton::LoadOp>::scalarizeWithLoop(
   Value resMemRef = createAlloca(loc, resMemRefTy, allocaPoint, rewriter);
   bool storeOtherInLoop = static_cast<bool>(mask);
   if (other && !canComputeScalarValue(other)) {
-    rewriter.create<triton::cpu::StoreOp>(loc, other, resMemRef);
+    triton::cpu::StoreOp::create(rewriter, loc, other, resMemRef);
     storeOtherInLoop = false;
   }
 
@@ -298,8 +298,8 @@ LogicalResult ScalarizeOpConversion<triton::LoadOp>::scalarizeWithLoop(
   SmallVector<Value> ivs;
   for (int64_t i = 0; i < tensorTy.getRank(); ++i) {
     Value upperBound =
-        rewriter.create<arith::ConstantIndexOp>(loc, tensorTy.getShape()[i]);
-    auto forOp = rewriter.create<scf::ForOp>(loc, zeroIdx, upperBound, oneIdx);
+        arith::ConstantIndexOp::create(rewriter, loc, tensorTy.getShape()[i]);
+    auto forOp = scf::ForOp::create(rewriter, loc, zeroIdx, upperBound, oneIdx);
     forOps.push_back(forOp);
     ivs.push_back(forOp.getInductionVar());
     rewriter.setInsertionPointToStart(forOp.getBody());
@@ -314,38 +314,38 @@ LogicalResult ScalarizeOpConversion<triton::LoadOp>::scalarizeWithLoop(
       scalarOther =
           computeScalarValue(other.getDefiningOp(), other, ivs, rewriter);
     } else {
-      scalarOther = rewriter.create<arith::ConstantOp>(
-          loc, tensorTy.getElementType(),
+      scalarOther = arith::ConstantOp::create(
+          rewriter, loc, tensorTy.getElementType(),
           rewriter.getZeroAttr(tensorTy.getElementType()));
     }
   }
 
   if (!mask) {
     // Regular load case.
-    Value val = rewriter.create<triton::LoadOp>(loc, scalarPtr, cache, evict,
-                                                isVolatile);
-    rewriter.create<memref::StoreOp>(loc, val, resMemRef, ivs);
+    Value val = triton::LoadOp::create(rewriter, loc, scalarPtr, cache, evict,
+                                       isVolatile);
+    memref::StoreOp::create(rewriter, loc, val, resMemRef, ivs);
   } else {
     // Conditional load case
-    rewriter.create<scf::IfOp>(
-        loc, scalarMask,
+    scf::IfOp::create(
+        rewriter, loc, scalarMask,
         [&](OpBuilder &builder, Location loc) {
-          Value val = builder.create<triton::LoadOp>(loc, scalarPtr, cache,
-                                                     evict, isVolatile);
-          builder.create<memref::StoreOp>(loc, val, resMemRef, ivs);
-          builder.create<scf::YieldOp>(loc);
+          Value val = triton::LoadOp::create(builder, loc, scalarPtr, cache,
+                                             evict, isVolatile);
+          memref::StoreOp::create(builder, loc, val, resMemRef, ivs);
+          scf::YieldOp::create(builder, loc);
         },
         [&](OpBuilder &builder, Location loc) {
           if (storeOtherInLoop)
-            builder.create<memref::StoreOp>(loc, scalarOther, resMemRef, ivs);
-          builder.create<scf::YieldOp>(loc);
+            memref::StoreOp::create(builder, loc, scalarOther, resMemRef, ivs);
+          scf::YieldOp::create(builder, loc);
         });
   }
 
   // Load vector from the temp storage and return it from alloca scope.
   rewriter.setInsertionPointAfter(forOps.front());
   SmallVector<Value> indices(tensorTy.getRank(), zeroIdx);
-  Value res = rewriter.create<triton::cpu::LoadOp>(loc, tensorTy, resMemRef);
+  Value res = triton::cpu::LoadOp::create(rewriter, loc, tensorTy, resMemRef);
   rewriter.replaceOp(loadOp, res);
   return success();
 }

@@ -146,7 +146,7 @@ Value loadRow(Location loc, VectorType resTy, const MemBuffer &buf, int64_t m,
   SmallVector<Value> indices = buf.indices;
   indices[indices.size() - 2] =
       shiftIndex(loc, indices[indices.size() - 2], m, rewriter);
-  return rewriter.create<vector::LoadOp>(loc, resTy, buf.memRef, indices);
+  return vector::LoadOp::create(rewriter, loc, resTy, buf.memRef, indices);
 }
 
 void storeRow(Location loc, const MemBuffer &buf, int64_t rowIdx, Value vec,
@@ -154,7 +154,7 @@ void storeRow(Location loc, const MemBuffer &buf, int64_t rowIdx, Value vec,
   SmallVector<Value> indices = buf.indices;
   indices[indices.size() - 2] =
       shiftIndex(loc, buf.indices[indices.size() - 2], rowIdx, rewriter);
-  rewriter.create<vector::StoreOp>(loc, vec, buf.memRef, indices);
+  vector::StoreOp::create(rewriter, loc, vec, buf.memRef, indices);
 }
 
 void storeRows(Location loc, const MemBuffer &buf,
@@ -169,8 +169,8 @@ SmallVector<Value> extractRows(Location loc, Value vec,
   VectorType vecTy = cast<VectorType>(vec.getType());
   SmallVector<Value> res;
   for (int64_t m = 0; m < vecTy.getDimSize(0); ++m) {
-    auto row =
-        rewriter.create<vector::ExtractOp>(loc, vec, SmallVector<int64_t>({m}));
+    auto row = vector::ExtractOp::create(rewriter, loc, vec,
+                                         SmallVector<int64_t>({m}));
     res.push_back(row);
   }
   return res;
@@ -179,18 +179,18 @@ SmallVector<Value> extractRows(Location loc, Value vec,
 Value mergeRows(Location loc, VectorType resTy, const SmallVector<Value> &tiles,
                 PatternRewriter &rewriter) {
   Value res =
-      rewriter.create<arith::ConstantOp>(loc, rewriter.getZeroAttr(resTy));
+      arith::ConstantOp::create(rewriter, loc, rewriter.getZeroAttr(resTy));
   for (int64_t m = 0; m < tiles.size(); ++m)
-    res = rewriter.create<vector::InsertOp>(loc, tiles[m], res,
-                                            SmallVector<int64_t>({m}));
+    res = vector::InsertOp::create(rewriter, loc, tiles[m], res,
+                                   SmallVector<int64_t>({m}));
   return res;
 }
 
 Value broadcastElem(Location loc, VectorType tileTy, const MemBuffer &buf,
                     int64_t m, int64_t n, PatternRewriter &rewriter) {
   SmallVector<Value> indices = shiftIndices(loc, buf, m, n, rewriter);
-  Value scalar = rewriter.create<memref::LoadOp>(loc, buf.memRef, indices);
-  return rewriter.create<vector::BroadcastOp>(loc, tileTy, scalar);
+  Value scalar = memref::LoadOp::create(rewriter, loc, buf.memRef, indices);
+  return vector::BroadcastOp::create(rewriter, loc, tileTy, scalar);
 }
 
 SmallVector<Value> computePrefetchIndices(Location loc, const MemBuffer &buf,
@@ -200,26 +200,27 @@ SmallVector<Value> computePrefetchIndices(Location loc, const MemBuffer &buf,
   Value itersVal;
   for (auto step : buf.step) {
     if (iters == 1)
-      scaledStep.push_back(rewriter.create<arith::IndexCastOp>(
-          loc, rewriter.getIndexType(), step));
+      scaledStep.push_back(arith::IndexCastOp::create(
+          rewriter, loc, rewriter.getIndexType(), step));
     else if (auto cstOp = dyn_cast<arith::ConstantOp>(step.getDefiningOp())) {
       int64_t oldVal = cast<IntegerAttr>(cstOp.getValue()).getInt();
       scaledStep.push_back(
-          rewriter.create<arith::ConstantIndexOp>(loc, oldVal * iters));
+          arith::ConstantIndexOp::create(rewriter, loc, oldVal * iters));
     } else {
       if (!itersVal)
         itersVal =
-            rewriter.create<arith::ConstantIntOp>(loc, step.getType(), iters);
-      scaledStep.push_back(rewriter.create<arith::IndexCastOp>(
-          loc, rewriter.getIndexType(),
-          rewriter.create<arith::MulIOp>(loc, step.getType(), step, itersVal)));
+            arith::ConstantIntOp::create(rewriter, loc, step.getType(), iters);
+      scaledStep.push_back(arith::IndexCastOp::create(
+          rewriter, loc, rewriter.getIndexType(),
+          arith::MulIOp::create(rewriter, loc, step.getType(), step,
+                                itersVal)));
     }
   }
 
   SmallVector<Value> res;
   for (int64_t i = 0; i < scaledStep.size(); ++i)
-    res.push_back(rewriter.create<arith::AddIOp>(
-        loc, buf.indices[i].getType(), buf.indices[i], scaledStep[i]));
+    res.push_back(arith::AddIOp::create(rewriter, loc, buf.indices[i].getType(),
+                                        buf.indices[i], scaledStep[i]));
   return res;
 }
 
@@ -228,8 +229,8 @@ void prefetch(Location loc, const MemBuffer &buf, int64_t m, int64_t n,
               PatternRewriter &rewriter) {
   SmallVector<Value> indices =
       shiftIndices(loc, prefetchIndices, buf.transposed, m, n, rewriter);
-  rewriter.create<memref::PrefetchOp>(loc, buf.memRef, indices, false, hint,
-                                      true);
+  memref::PrefetchOp::create(rewriter, loc, buf.memRef, indices, false, hint,
+                             true);
 }
 
 LogicalResult convertCandidate(FmaDotOpCandidate &candidate,
@@ -326,8 +327,8 @@ LogicalResult convertCandidate(FmaDotOpCandidate &candidate,
                    rewriter);
       }
 
-      accVecs[m] = rewriter.create<vector::FMAOp>(loc, rhsVec, lhsBroadcasted,
-                                                  accVecs[m]);
+      accVecs[m] = vector::FMAOp::create(rewriter, loc, rhsVec, lhsBroadcasted,
+                                         accVecs[m]);
     }
   }
 

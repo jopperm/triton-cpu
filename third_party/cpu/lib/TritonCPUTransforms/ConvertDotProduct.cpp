@@ -194,12 +194,12 @@ struct ConvertMulSumToDotHorizontalSum
 
     Type outResTy = VectorType::get(resultLanes, resTy.getElementType());
 
-    Value zeroRes = rewriter.create<arith::ConstantOp>(
-        loc, outResTy, rewriter.getZeroAttr(outResTy));
+    Value zeroRes = arith::ConstantOp::create(rewriter, loc, outResTy,
+                                              rewriter.getZeroAttr(outResTy));
     for (int64_t outIdx = 0; outIdx < numOfOutputChannels; outIdx += 1) {
       outRes[outIdx] = zeroRes;
       // Intermediate array to store each row of the input matrix.
-      mats[outIdx] = rewriter.create<vector::ExtractOp>(loc, matInput, outIdx);
+      mats[outIdx] = vector::ExtractOp::create(rewriter, loc, matInput, outIdx);
     }
 
     SmallVector<Type> resultTypes = {outResTy};
@@ -208,10 +208,10 @@ struct ConvertMulSumToDotHorizontalSum
     SmallVector<Value> args;
 
     for (int64_t idx = 0; idx < numOfBfdotOps; idx += 1) {
-      auto subVec = rewriter.create<vector::ExtractOp>(loc, vecInput, idx);
+      auto subVec = vector::ExtractOp::create(rewriter, loc, vecInput, idx);
       for (int64_t outIdx = 0; outIdx < numOfOutputChannels; outIdx += 1) {
         auto subMat =
-            rewriter.create<vector::ExtractOp>(loc, mats[outIdx], idx);
+            vector::ExtractOp::create(rewriter, loc, mats[outIdx], idx);
         args = {outRes[outIdx], subMat, subVec};
         // bfdot instruction:
         // https://developer.arm.com/documentation/ddi0602/2024-06/SIMD-FP-Instructions/BFDOT--vector---BFloat16-floating-point-dot-product--vector--
@@ -220,15 +220,15 @@ struct ConvertMulSumToDotHorizontalSum
         // This bfdot intrinsic will perform an unfused sum-of-products of each
         // pair of adjacent bf16 elements in the source vectors (8 bf16), and
         // output 4 fp32 elements.
-        auto callIntrOp = rewriter.create<LLVM::CallIntrinsicOp>(
-            loc, resultTypes, bfdot, args,
+        auto callIntrOp = LLVM::CallIntrinsicOp::create(
+            rewriter, loc, resultTypes, bfdot, args,
             LLVM::FastmathFlagsAttr::get(ctx, LLVM::FastmathFlags::fast));
         outRes[outIdx] = callIntrOp.getResult(0);
       }
     }
 
-    Value res = rewriter.create<arith::ConstantOp>(loc, resTy,
-                                                   rewriter.getZeroAttr(resTy));
+    Value res = arith::ConstantOp::create(rewriter, loc, resTy,
+                                          rewriter.getZeroAttr(resTy));
 
     resultTypes = {resTy.getElementType()};
     // TODO: this intrinsic is hard-coded for Arm Neon
@@ -237,15 +237,15 @@ struct ConvertMulSumToDotHorizontalSum
       args = {outRes[outIdx]};
       // This horizontal sum intrinsic will sum all fp32 elements in the source
       // vector into a single fp32 element
-      auto callIntrOp = rewriter.create<LLVM::CallIntrinsicOp>(
-          loc, resultTypes, horzSum, args,
+      auto callIntrOp = LLVM::CallIntrinsicOp::create(
+          rewriter, loc, resultTypes, horzSum, args,
           LLVM::FastmathFlagsAttr::get(ctx, LLVM::FastmathFlags::fast));
-      res = rewriter.create<vector::InsertOp>(loc, callIntrOp.getResult(0), res,
-                                              outIdx);
+      res = vector::InsertOp::create(rewriter, loc, callIntrOp.getResult(0),
+                                     res, outIdx);
     }
 
     if (!isZeroConst(acc)) {
-      res = rewriter.create<arith::AddFOp>(loc, res, acc);
+      res = arith::AddFOp::create(rewriter, loc, res, acc);
     }
     rewriter.replaceOp(op, res);
     return success();
@@ -376,28 +376,30 @@ struct ConvertMulSumToDotPack
     vecInput =
         shapeCast(loc, vecInput, {numOfVecRegs, resultLanes, 2}, rewriter);
     // We bitcast here because we are pulling pairs of bf16 each time.
-    vecInput = rewriter.create<vector::BitCastOp>(
-        loc, VectorType::get({numOfVecRegs, resultLanes, 1}, pairTy), vecInput);
+    vecInput = vector::BitCastOp::create(
+        rewriter, loc, VectorType::get({numOfVecRegs, resultLanes, 1}, pairTy),
+        vecInput);
     vecInput = shapeCast(loc, vecInput, {numOfVecRegs, resultLanes}, rewriter);
 
     matInput = shapeCast(loc, matInput, {numOfOutputChannels, numOfVecPairs, 2},
                          rewriter);
     // We bitcast here because we are pulling pairs of bf16 each time.
-    matInput = rewriter.create<vector::BitCastOp>(
-        loc, VectorType::get({numOfOutputChannels, numOfVecPairs, 1}, pairTy),
+    matInput = vector::BitCastOp::create(
+        rewriter, loc,
+        VectorType::get({numOfOutputChannels, numOfVecPairs, 1}, pairTy),
         matInput);
     matInput = shapeCast(loc, matInput, {numOfOutputChannels, numOfVecPairs},
                          rewriter);
     // Packing/Transposing the weight matrix so that
     // the output channel is continuous
-    matInput = rewriter.create<vector::TransposeOp>(
-        loc, matInput, SmallVector<int64_t, 2>{1, 0});
+    matInput = vector::TransposeOp::create(rewriter, loc, matInput,
+                                           SmallVector<int64_t, 2>{1, 0});
     matInput = shapeCast(
         loc, matInput,
         {numOfVecRegs, resultLanes, numOfOutputRegs, resultLanes}, rewriter);
 
-    Value res = rewriter.create<arith::ConstantOp>(
-        loc, fullResTy, rewriter.getZeroAttr(fullResTy));
+    Value res = arith::ConstantOp::create(rewriter, loc, fullResTy,
+                                          rewriter.getZeroAttr(fullResTy));
     SmallVector<Type> resultTypes = {subResTy};
     // TODO: this intrinsic is hard-coded for Arm Neon
     auto bfdot = StringAttr::get(ctx, "llvm.aarch64.neon.bfdot.v4f32.v8bf16");
@@ -405,23 +407,24 @@ struct ConvertMulSumToDotPack
 
     SmallVector<Value> subRes(numOfOutputRegs);
     for (int64_t outIdx = 0; outIdx < numOfOutputRegs; outIdx += 1) {
-      subRes[outIdx] = rewriter.create<vector::ExtractOp>(loc, acc, outIdx);
+      subRes[outIdx] = vector::ExtractOp::create(rewriter, loc, acc, outIdx);
     }
     for (int64_t idx = 0; idx < numOfVecRegs; idx += 1) {
-      Value fullVec = rewriter.create<vector::ExtractOp>(loc, vecInput, idx);
+      Value fullVec = vector::ExtractOp::create(rewriter, loc, vecInput, idx);
       for (int64_t vecIdx = 0; vecIdx < resultLanes; vecIdx += 1) {
         // shuffle mask used to broadcast the 'vecIdx'th lane of fullVec
         SmallVector<int64_t> shuffleMask(resultLanes, vecIdx);
         // Broadcasting the 'vecIdx'th lane of fullVec
-        Value subVec = rewriter.create<vector::ShuffleOp>(loc, fullVec, fullVec,
-                                                          shuffleMask);
-        subVec = rewriter.create<vector::BitCastOp>(
-            loc, VectorType::get({lanes}, inElemTy), subVec);
+        Value subVec = vector::ShuffleOp::create(rewriter, loc, fullVec,
+                                                 fullVec, shuffleMask);
+        subVec = vector::BitCastOp::create(
+            rewriter, loc, VectorType::get({lanes}, inElemTy), subVec);
         for (int64_t outIdx = 0; outIdx < numOfOutputRegs; outIdx += 1) {
-          Value subMat = rewriter.create<vector::ExtractOp>(
-              loc, matInput, SmallVector<int64_t, 3>{idx, vecIdx, outIdx});
-          subMat = rewriter.create<vector::BitCastOp>(
-              loc, VectorType::get({lanes}, inElemTy), subMat);
+          Value subMat = vector::ExtractOp::create(
+              rewriter, loc, matInput,
+              SmallVector<int64_t, 3>{idx, vecIdx, outIdx});
+          subMat = vector::BitCastOp::create(
+              rewriter, loc, VectorType::get({lanes}, inElemTy), subMat);
           args = {subRes[outIdx], subMat, subVec};
           // bfdot instruction:
           // https://developer.arm.com/documentation/ddi0602/2024-06/SIMD-FP-Instructions/BFDOT--vector---BFloat16-floating-point-dot-product--vector--
@@ -430,8 +433,8 @@ struct ConvertMulSumToDotPack
           // This bfdot intrinsic will perform an unfused sum-of-products of
           // each pair of adjacent bf16 elements in the source vectors
           // (8 bf16), and output 4 fp32 elements.
-          auto callIntrOp = rewriter.create<LLVM::CallIntrinsicOp>(
-              loc, resultTypes, bfdot, args,
+          auto callIntrOp = LLVM::CallIntrinsicOp::create(
+              rewriter, loc, resultTypes, bfdot, args,
               LLVM::FastmathFlagsAttr::get(ctx, LLVM::FastmathFlags::fast));
           subRes[outIdx] = callIntrOp.getResult(0);
         }
@@ -439,7 +442,8 @@ struct ConvertMulSumToDotPack
     }
 
     for (int64_t outIdx = 0; outIdx < numOfOutputRegs; outIdx += 1) {
-      res = rewriter.create<vector::InsertOp>(loc, subRes[outIdx], res, outIdx);
+      res =
+          vector::InsertOp::create(rewriter, loc, subRes[outIdx], res, outIdx);
     }
 
     res = shapeCast(loc, res, resTy, rewriter);

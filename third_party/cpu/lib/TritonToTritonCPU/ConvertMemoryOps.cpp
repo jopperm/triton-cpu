@@ -64,10 +64,10 @@ struct MemoryOpConversion : public OpConversionPattern<OpT> {
     }
 
     // Fall back to a scalar pointer extraction from the vector.
-    Value ptr = rewriter.create<vector::ExtractOp>(
-        loc, rewriter.getRemappedValue(ptrs), indices);
+    Value ptr = vector::ExtractOp::create(
+        rewriter, loc, rewriter.getRemappedValue(ptrs), indices);
     auto ptrTy = dyn_cast<RankedTensorType>(ptrs.getType()).getElementType();
-    ptr = rewriter.create<IntToPtrOp>(loc, ptrTy, ptr);
+    ptr = IntToPtrOp::create(rewriter, loc, ptrTy, ptr);
     return ptr;
   }
 
@@ -87,7 +87,7 @@ struct MemoryOpConversion : public OpConversionPattern<OpT> {
       auto layout = StridedLayoutAttr::get(getContext(), 0, dynVals);
       memRefTy = MemRefType::get(dynVals, elemTy, layout);
     }
-    return rewriter.create<ExtractMemRefOp>(loc, memRefTy, ptr);
+    return ExtractMemRefOp::create(rewriter, loc, memRefTy, ptr);
   }
 
   Value convertOtherVal(triton::LoadOp loadOp,
@@ -97,8 +97,8 @@ struct MemoryOpConversion : public OpConversionPattern<OpT> {
 
     auto resTy =
         dyn_cast<VectorType>(getTypeConverter()->convertType(loadOp.getType()));
-    return rewriter.create<arith::ConstantOp>(
-        loadOp.getLoc(), resTy,
+    return arith::ConstantOp::create(
+        rewriter, loadOp.getLoc(), resTy,
         SplatElementsAttr::get(resTy,
                                rewriter.getZeroAttr(resTy.getElementType())));
   }
@@ -107,8 +107,8 @@ struct MemoryOpConversion : public OpConversionPattern<OpT> {
                      ConversionPatternRewriter &rewriter) const {
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(before);
-    return rewriter.create<memref::AllocaOp>(
-        loc, ty, rewriter.getIntegerAttr(rewriter.getI64Type(), 64));
+    return memref::AllocaOp::create(
+        rewriter, loc, ty, rewriter.getIntegerAttr(rewriter.getI64Type(), 64));
   }
 
   // If tensor is not null and its element cannot be recomputed in a scalar
@@ -126,14 +126,14 @@ struct MemoryOpConversion : public OpConversionPattern<OpT> {
     // but vector store (through transfer write) would write 1 bit per element.
     if (elemTy.isInteger(1)) {
       elemTy = rewriter.getI8Type();
-      vec = rewriter.create<arith::ExtUIOp>(
-          loc, VectorType::get(vecTy.getShape(), elemTy), vec);
+      vec = arith::ExtUIOp::create(
+          rewriter, loc, VectorType::get(vecTy.getShape(), elemTy), vec);
     }
     auto memRefTy = MemRefType::get(vecTy.getShape(), elemTy);
     Value memRef = createAlloca(vals.getLoc(), memRefTy, allocaPoint, rewriter);
     SmallVector<Value> indices(vecTy.getRank(), zeroIdx);
-    rewriter.create<vector::TransferWriteOp>(vals.getLoc(), vec, memRef,
-                                             indices);
+    vector::TransferWriteOp::create(rewriter, vals.getLoc(), vec, memRef,
+                                    indices);
     return memRef;
   }
 
@@ -165,7 +165,7 @@ struct LoadOpConversion : public MemoryOpConversion<triton::LoadOp> {
       break;
     }
 
-    return rewriter.create<arith::ConstantOp>(loc, attr);
+    return arith::ConstantOp::create(rewriter, loc, attr);
   }
 
   LogicalResult
@@ -196,15 +196,15 @@ struct LoadOpConversion : public MemoryOpConversion<triton::LoadOp> {
     auto rank = dyn_cast<MemRefType>(memRef.getType()).getRank();
     auto resTy = dyn_cast<VectorType>(
         getTypeConverter()->convertType(loadOp.getResult().getType()));
-    auto indices = rewriter.create<ExtractIndicesOp>(loc, ptr).getResults();
+    auto indices = ExtractIndicesOp::create(rewriter, loc, ptr).getResults();
     SmallVector<bool, 4> inBounds(rank, true);
     for (auto dim : boundaryChecks) {
       inBounds[dim] = false;
     }
     Value padding = getPaddingValue(loc, resTy.getElementType(),
                                     loadOp.getPadding(), rewriter);
-    auto vecRead = rewriter.create<vector::TransferReadOp>(
-        loc, resTy, memRef, indices, padding, inBounds);
+    auto vecRead = vector::TransferReadOp::create(rewriter, loc, resTy, memRef,
+                                                  indices, padding, inBounds);
     rewriter.replaceOp(loadOp, vecRead);
     return success();
   }
@@ -228,7 +228,7 @@ struct LoadOpConversion : public MemoryOpConversion<triton::LoadOp> {
     Type memRefTy = MemRefType::get(shape.back(), vecTy.getElementType());
     Value mask = loadOp.getMask() ? rewriter.getRemappedValue(loadOp.getMask())
                                   : nullptr;
-    Value zeroIdx = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value zeroIdx = arith::ConstantIndexOp::create(rewriter, loc, 0);
     Value defaultVal = convertOtherVal(loadOp, rewriter);
     Value res = defaultVal;
     for (int64_t idx = 0; idx < numElems; idx += shape.back()) {
@@ -237,24 +237,24 @@ struct LoadOpConversion : public MemoryOpConversion<triton::LoadOp> {
                                       indices.begin() + indices.size() - 1);
       auto ptr = extractScalarPointer(loc, loadOp.getPtr(), indices, rewriter);
       Value memRef =
-          rewriter.create<triton::cpu::PtrToMemRefOp>(loc, memRefTy, ptr);
+          triton::cpu::PtrToMemRefOp::create(rewriter, loc, memRefTy, ptr);
       Value vec;
       if (mask) {
         Value subMask = mask;
         Value passThru = defaultVal;
         if (shape.size() > 1) {
-          subMask = rewriter.create<vector::ExtractOp>(loc, mask, subIndices);
+          subMask = vector::ExtractOp::create(rewriter, loc, mask, subIndices);
           passThru =
-              rewriter.create<vector::ExtractOp>(loc, defaultVal, subIndices);
+              vector::ExtractOp::create(rewriter, loc, defaultVal, subIndices);
         }
-        vec = rewriter.create<vector::MaskedLoadOp>(loc, subVecTy, memRef,
-                                                    zeroIdx, subMask, passThru);
+        vec = vector::MaskedLoadOp::create(rewriter, loc, subVecTy, memRef,
+                                           zeroIdx, subMask, passThru);
       } else {
-        vec = rewriter.create<vector::LoadOp>(loc, subVecTy, memRef, zeroIdx);
+        vec = vector::LoadOp::create(rewriter, loc, subVecTy, memRef, zeroIdx);
       }
 
       if (shape.size() > 1) {
-        res = rewriter.create<vector::InsertOp>(loc, vec, res, subIndices);
+        res = vector::InsertOp::create(rewriter, loc, vec, res, subIndices);
       } else {
         res = vec;
       }
@@ -279,8 +279,8 @@ struct LoadOpConversion : public MemoryOpConversion<triton::LoadOp> {
     auto pointeeType =
         dyn_cast<PointerType>(basePtr.getType()).getPointeeType();
 
-    auto gatherBase = rewriter.create<triton::cpu::PtrToMemRefOp>(
-        loc, MemRefType::get({}, pointeeType), basePtr);
+    auto gatherBase = triton::cpu::PtrToMemRefOp::create(
+        rewriter, loc, MemRefType::get({}, pointeeType), basePtr);
     auto gatherIndices = SmallVector<Value>();
     auto gatherIndexVec = rewriter.getRemappedValue(offset);
 
@@ -289,15 +289,15 @@ struct LoadOpConversion : public MemoryOpConversion<triton::LoadOp> {
       gatherMask = rewriter.getRemappedValue(loadMask);
     } else {
       auto maskType = VectorType::get(shape, rewriter.getI1Type());
-      gatherMask = rewriter.create<arith::ConstantOp>(
-          loc, maskType, DenseElementsAttr::get(maskType, true));
+      gatherMask = arith::ConstantOp::create(
+          rewriter, loc, maskType, DenseElementsAttr::get(maskType, true));
     }
 
     auto passThru = convertOtherVal(loadOp, rewriter);
 
-    auto gatherOp =
-        rewriter.create<vector::GatherOp>(loc, vecTy, gatherBase, gatherIndices,
-                                          gatherIndexVec, gatherMask, passThru);
+    auto gatherOp = vector::GatherOp::create(rewriter, loc, vecTy, gatherBase,
+                                             gatherIndices, gatherIndexVec,
+                                             gatherMask, passThru);
     rewriter.replaceOp(loadOp, gatherOp);
     return success();
   }
@@ -322,11 +322,11 @@ struct LoadOpConversion : public MemoryOpConversion<triton::LoadOp> {
     auto isVolatile = loadOp.getIsVolatile();
 
     auto loadOne = [=, &rewriter](ArrayRef<int64_t> indices, Value dst) {
-      Value ptr = rewriter.create<vector::ExtractOp>(loc, ptrs, indices);
-      ptr = rewriter.create<IntToPtrOp>(loc, ptrTy, ptr);
+      Value ptr = vector::ExtractOp::create(rewriter, loc, ptrs, indices);
+      ptr = IntToPtrOp::create(rewriter, loc, ptrTy, ptr);
       Value val =
-          rewriter.create<triton::LoadOp>(loc, ptr, cache, evict, isVolatile);
-      return rewriter.create<vector::InsertOp>(loc, val, dst, indices);
+          triton::LoadOp::create(rewriter, loc, ptr, cache, evict, isVolatile);
+      return vector::InsertOp::create(rewriter, loc, val, dst, indices);
     };
 
     Value dst = convertOtherVal(loadOp, rewriter);
@@ -339,15 +339,15 @@ struct LoadOpConversion : public MemoryOpConversion<triton::LoadOp> {
         continue;
       }
       // Create a conditional block for load if there is a mask.
-      auto predicate = rewriter.create<vector::ExtractOp>(loc, mask, indices);
-      auto ifOp = rewriter.create<scf::IfOp>(
-          loc, predicate,
+      auto predicate = vector::ExtractOp::create(rewriter, loc, mask, indices);
+      auto ifOp = scf::IfOp::create(
+          rewriter, loc, predicate,
           [&](OpBuilder &builder, Location loc) {
             auto result = loadOne(indices, dst).getResult();
-            rewriter.create<scf::YieldOp>(loc, result);
+            scf::YieldOp::create(rewriter, loc, result);
           },
           [&](OpBuilder &builder, Location loc) {
-            rewriter.create<scf::YieldOp>(loc, dst);
+            scf::YieldOp::create(rewriter, loc, dst);
           });
       dst = ifOp.getResult(0);
     }
@@ -388,13 +388,13 @@ struct StoreOpConversion : public MemoryOpConversion<triton::StoreOp> {
     auto value = rewriter.getRemappedValue(storeOp.getValue());
     auto memRef = extractMemRef(loc, ptr, rewriter);
     auto rank = dyn_cast<MemRefType>(memRef.getType()).getRank();
-    auto indices = rewriter.create<ExtractIndicesOp>(loc, ptr).getResults();
+    auto indices = ExtractIndicesOp::create(rewriter, loc, ptr).getResults();
     SmallVector<bool, 4> inBounds(rank, true);
     for (auto dim : boundaryChecks) {
       inBounds[dim] = false;
     }
-    auto vecWrite = rewriter.create<vector::TransferWriteOp>(loc, value, memRef,
-                                                             indices, inBounds);
+    auto vecWrite = vector::TransferWriteOp::create(rewriter, loc, value,
+                                                    memRef, indices, inBounds);
     rewriter.replaceOp(storeOp, vecWrite);
     return success();
   }
@@ -418,26 +418,26 @@ struct StoreOpConversion : public MemoryOpConversion<triton::StoreOp> {
     Value mask = storeOp.getMask()
                      ? rewriter.getRemappedValue(storeOp.getMask())
                      : nullptr;
-    Value zeroIdx = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value zeroIdx = arith::ConstantIndexOp::create(rewriter, loc, 0);
     for (int64_t idx = 0; idx < numElems; idx += shape.back()) {
       auto indices = delinearize(idx, strides);
       auto ptr = extractScalarPointer(loc, storeOp.getPtr(), indices, rewriter);
       Value memRef =
-          rewriter.create<triton::cpu::PtrToMemRefOp>(loc, memRefTy, ptr);
+          triton::cpu::PtrToMemRefOp::create(rewriter, loc, memRefTy, ptr);
       indices.pop_back();
-      auto val = rewriter.create<vector::ExtractOp>(loc, vals, indices);
+      auto val = vector::ExtractOp::create(rewriter, loc, vals, indices);
 
       if (mask) {
         Value subMask = mask;
         if (shape.size() > 1) {
           SmallVector<int64_t> subIndices = indices;
           subIndices.pop_back();
-          subMask = rewriter.create<vector::ExtractOp>(loc, mask, indices);
+          subMask = vector::ExtractOp::create(rewriter, loc, mask, indices);
         }
-        rewriter.create<vector::MaskedStoreOp>(loc, memRef, zeroIdx, subMask,
-                                               val);
+        vector::MaskedStoreOp::create(rewriter, loc, memRef, zeroIdx, subMask,
+                                      val);
       } else {
-        rewriter.create<vector::StoreOp>(loc, val, memRef, zeroIdx);
+        vector::StoreOp::create(rewriter, loc, val, memRef, zeroIdx);
       }
     }
 
@@ -468,26 +468,26 @@ struct StoreOpConversion : public MemoryOpConversion<triton::StoreOp> {
       auto indices = delinearize(idx, strides);
       indices.pop_back();
 
-      auto val = rewriter.create<vector::ExtractOp>(loc, vals, indices);
-      auto indexVec = rewriter.create<vector::ExtractOp>(
-          loc, rewriter.getRemappedValue(offset), indices);
+      auto val = vector::ExtractOp::create(rewriter, loc, vals, indices);
+      auto indexVec = vector::ExtractOp::create(
+          rewriter, loc, rewriter.getRemappedValue(offset), indices);
       Value scatterMask;
 
       if (mask) {
-        scatterMask = rewriter.create<vector::ExtractOp>(loc, mask, indices);
+        scatterMask = vector::ExtractOp::create(rewriter, loc, mask, indices);
       } else {
         // Create a mask with all true values if no mask is provided.
         auto maskType = VectorType::get({shape.back()}, rewriter.getI1Type());
-        scatterMask = rewriter.create<arith::ConstantOp>(
-            loc, maskType, DenseElementsAttr::get(maskType, true));
+        scatterMask = arith::ConstantOp::create(
+            rewriter, loc, maskType, DenseElementsAttr::get(maskType, true));
       }
 
-      auto scatterBase = rewriter.create<triton::cpu::PtrToMemRefOp>(
-          loc, MemRefType::get({}, vecTy.getElementType()), basePtr);
+      auto scatterBase = triton::cpu::PtrToMemRefOp::create(
+          rewriter, loc, MemRefType::get({}, vecTy.getElementType()), basePtr);
       auto scatterIndices = SmallVector<Value>();
 
-      rewriter.create<vector::ScatterOp>(loc, scatterBase, scatterIndices,
-                                         indexVec, scatterMask, val);
+      vector::ScatterOp::create(rewriter, loc, vecTy, scatterBase,
+                                scatterIndices, indexVec, scatterMask, val);
     }
 
     rewriter.eraseOp(storeOp);
@@ -512,10 +512,10 @@ struct StoreOpConversion : public MemoryOpConversion<triton::StoreOp> {
     auto evict = storeOp.getEvict();
 
     auto storeOne = [=, &rewriter](ArrayRef<int64_t> indices) {
-      Value ptr = rewriter.create<vector::ExtractOp>(loc, ptrs, indices);
-      ptr = rewriter.create<IntToPtrOp>(loc, ptrTy, ptr);
-      Value val = rewriter.create<vector::ExtractOp>(loc, vals, indices);
-      rewriter.create<triton::StoreOp>(loc, ptr, val, cache, evict);
+      Value ptr = vector::ExtractOp::create(rewriter, loc, ptrs, indices);
+      ptr = IntToPtrOp::create(rewriter, loc, ptrTy, ptr);
+      Value val = vector::ExtractOp::create(rewriter, loc, vals, indices);
+      triton::StoreOp::create(rewriter, loc, ptr, val, cache, evict);
     };
 
     int64_t numElems = tensorTy.getNumElements();
@@ -527,12 +527,12 @@ struct StoreOpConversion : public MemoryOpConversion<triton::StoreOp> {
         continue;
       }
       // Create a conditional block for store if there is a mask.
-      auto predicate = rewriter.create<vector::ExtractOp>(loc, mask, indices);
-      rewriter.create<scf::IfOp>(loc, predicate,
-                                 [&](OpBuilder &builder, Location loc) {
-                                   storeOne(indices);
-                                   rewriter.create<scf::YieldOp>(loc);
-                                 });
+      auto predicate = vector::ExtractOp::create(rewriter, loc, mask, indices);
+      scf::IfOp::create(rewriter, loc, predicate,
+                        [&](OpBuilder &builder, Location loc) {
+                          storeOne(indices);
+                          scf::YieldOp::create(rewriter, loc);
+                        });
     }
 
     rewriter.eraseOp(storeOp);
@@ -551,11 +551,11 @@ struct CpuStoreOpConversion : public MemoryOpConversion<triton::cpu::StoreOp> {
     auto value = rewriter.getRemappedValue(storeOp.getSrc());
     auto memRef = storeOp.getDst();
     auto rank = dyn_cast<MemRefType>(memRef.getType()).getRank();
-    Value zeroIdx = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value zeroIdx = arith::ConstantIndexOp::create(rewriter, loc, 0);
     SmallVector<Value> indices(rank, zeroIdx);
     auto vecWrite =
-        rewriter.create<vector::TransferWriteOp>(loc, value, memRef,
-                                                 indices); //, inBounds);
+        vector::TransferWriteOp::create(rewriter, loc, value, memRef,
+                                        indices); //, inBounds);
     rewriter.replaceOp(storeOp, vecWrite);
     return success();
   }
@@ -572,10 +572,10 @@ struct CpuLoadOpConversion : public MemoryOpConversion<triton::cpu::LoadOp> {
     auto rank = dyn_cast<MemRefType>(memRef.getType()).getRank();
     auto resTy = dyn_cast<VectorType>(
         getTypeConverter()->convertType(loadOp.getResult().getType()));
-    Value zeroIdx = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value zeroIdx = arith::ConstantIndexOp::create(rewriter, loc, 0);
     SmallVector<Value> indices(resTy.getRank(), zeroIdx);
-    auto vecRead = rewriter.create<vector::TransferReadOp>(
-        loc, resTy, memRef, indices,
+    auto vecRead = vector::TransferReadOp::create(
+        rewriter, loc, resTy, memRef, indices,
         arith::getZeroConstant(rewriter, loc, resTy.getElementType()));
     rewriter.replaceOp(loadOp, vecRead);
     return success();

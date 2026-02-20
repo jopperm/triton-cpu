@@ -108,9 +108,9 @@ struct AtomicCASOpConversion : public OpConversionPattern<AtomicCASOp> {
     auto failureOrdering = ordering != LLVM::AtomicOrdering::monotonic
                                ? LLVM::AtomicOrdering::acquire
                                : ordering;
-    Value cmpXchg = rewriter.create<LLVM::AtomicCmpXchgOp>(
-        loc, ptr, cmp, val, ordering, failureOrdering);
-    Value oldVal = rewriter.create<LLVM::ExtractValueOp>(loc, cmpXchg, 0);
+    Value cmpXchg = LLVM::AtomicCmpXchgOp::create(rewriter, loc, ptr, cmp, val,
+                                                  ordering, failureOrdering);
+    Value oldVal = LLVM::ExtractValueOp::create(rewriter, loc, cmpXchg, 0);
     rewriter.replaceOp(op, oldVal);
     return success();
   }

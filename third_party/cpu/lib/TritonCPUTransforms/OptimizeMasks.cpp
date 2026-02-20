@@ -102,7 +102,7 @@ struct CdivToDiv : public OpRewritePattern<arith::DivSIOp> {
 
     Value res = op.getResult();
     Value newRes =
-        rewriter.create<arith::DivSIOp>(loc, addOtherVal, divisorDef);
+        arith::DivSIOp::create(rewriter, loc, addOtherVal, divisorDef);
     int replaced = 0;
     rewriter.replaceUsesWithIf(res, newRes, [&](OpOperand &use) {
       if (auto forOp = dyn_cast<scf::ForOp>(use.getOwner())) {
@@ -202,14 +202,14 @@ struct ScaleInductionVariable : public OpRewritePattern<scf::ForOp> {
     Value newLower = lower;
     if (lowerVal != 0) {
       rewriter.setInsertionPointAfterValue(lower);
-      newLower = rewriter.create<arith::ConstantIntOp>(
-          lower.getLoc(), lower.getType(), lowerVal * scaleVal);
+      newLower = arith::ConstantIntOp::create(
+          rewriter, lower.getLoc(), lower.getType(), lowerVal * scaleVal);
     }
     // New Upper bound.
     Value newUpper = divLhs;
     // Build new step.
     rewriter.setInsertionPoint(op);
-    auto newStep = rewriter.create<arith::MulIOp>(ivUse.getLoc(), step, scale);
+    auto newStep = arith::MulIOp::create(rewriter, ivUse.getLoc(), step, scale);
 
     // Modify ForOp.
     rewriter.startOpModification(op);
@@ -229,8 +229,9 @@ struct ScaleInductionVariable : public OpRewritePattern<scf::ForOp> {
 // symbolTable is used to map SSA names to affine symbols.
 AffineExpr buildMinOrMaxExpr(Value val, bool isSigned, bool isMax,
                              llvm::DenseMap<Value, unsigned> &symbolTable) {
-  if (auto def = val.getDefiningOp<vector::SplatOp>()) {
-    return buildMinOrMaxExpr(def.getInput(), isSigned, isMax, symbolTable);
+  if (auto def = val.getDefiningOp<vector::BroadcastOp>();
+      def && !isa<VectorType>(def.getSourceType())) {
+    return buildMinOrMaxExpr(def.getSource(), isSigned, isMax, symbolTable);
   } else if (auto def = val.getDefiningOp<arith::ConstantOp>()) {
     auto attr = def.getValueAttr();
     if (auto intAttr = dyn_cast<IntegerAttr>(attr))

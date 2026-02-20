@@ -56,24 +56,25 @@ struct HistogramOpConversion : public OpConversionPattern<triton::HistogramOp> {
     if (srcTy.getRank() != 1)
       llvm_unreachable("unsupported input for histogram op (rank != 1)");
 
-    Value zero = rewriter.create<arith::ConstantOp>(
-        loc, resTy, rewriter.getZeroAttr(resTy));
-    Value one = rewriter.create<arith::ConstantOp>(loc, resTy,
-                                                   rewriter.getOneAttr(resTy));
+    Value zero = arith::ConstantOp::create(rewriter, loc, resTy,
+                                           rewriter.getZeroAttr(resTy));
+    Value one = arith::ConstantOp::create(rewriter, loc, resTy,
+                                          rewriter.getOneAttr(resTy));
     VectorType cmpVecTy =
         VectorType::get(resTy.getShape(), srcTy.getElementType());
-    Value rangeVec = rewriter.create<arith::ConstantOp>(
-        loc, resTy, makeRangeAttr(cmpVecTy, rewriter));
+    Value rangeVec = arith::ConstantOp::create(
+        rewriter, loc, resTy, makeRangeAttr(cmpVecTy, rewriter));
     Value res = zero;
     for (int64_t i = 0; i < srcTy.getShape()[0]; ++i) {
-      Value idx = rewriter.create<arith::ConstantOp>(
-          loc, rewriter.getIndexType(), rewriter.getIndexAttr(i));
-      Value elem = rewriter.create<vector::ExtractOp>(loc, src, idx);
-      Value elemVec = rewriter.create<vector::BroadcastOp>(loc, cmpVecTy, elem);
-      Value mask = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
-                                                  elemVec, rangeVec);
+      Value idx = arith::ConstantOp::create(
+          rewriter, loc, rewriter.getIndexType(), rewriter.getIndexAttr(i));
+      Value elem = vector::ExtractOp::create(rewriter, loc, src, idx);
+      Value elemVec =
+          vector::BroadcastOp::create(rewriter, loc, cmpVecTy, elem);
+      Value mask = arith::CmpIOp::create(
+          rewriter, loc, arith::CmpIPredicate::eq, elemVec, rangeVec);
       Value delta = vector::selectPassthru(rewriter, mask, one, zero);
-      res = rewriter.create<arith::AddIOp>(loc, res, delta);
+      res = arith::AddIOp::create(rewriter, loc, res, delta);
     }
 
     rewriter.replaceOp(op, res);

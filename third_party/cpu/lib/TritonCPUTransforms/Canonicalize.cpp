@@ -70,9 +70,9 @@ struct FoldReadShapeCast : public OpRewritePattern<vector::TransferReadOp> {
         permMap.getNumDims(), dstTy.getRank(), getContext());
     auto newInBounds = rewriter.getArrayAttr(SmallVector<Attribute>(drop_begin(
         op.getInBounds().getValue(), ty.getRank() - dstTy.getRank())));
-    auto newRead = rewriter.create<vector::TransferReadOp>(
-        loc, dstTy, op.getBase(), op.getIndices(), newPermMap, op.getPadding(),
-        op.getMask(), newInBounds);
+    auto newRead = vector::TransferReadOp::create(
+        rewriter, loc, dstTy, op.getBase(), op.getIndices(), newPermMap,
+        op.getPadding(), op.getMask(), newInBounds);
     rewriter.replaceOp(reshape, newRead);
     rewriter.eraseOp(op);
 

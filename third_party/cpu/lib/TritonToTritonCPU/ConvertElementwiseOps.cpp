@@ -93,7 +93,7 @@ struct MulhiUIOpConversion : public OpConversionPattern<triton::MulhiUIOp> {
     auto lhs = rewriter.getRemappedValue(op.getX());
     auto rhs = rewriter.getRemappedValue(op.getY());
     Value res =
-        rewriter.create<arith::MulUIExtendedOp>(loc, lhs, rhs).getHigh();
+        arith::MulUIExtendedOp::create(rewriter, loc, lhs, rhs).getHigh();
     rewriter.replaceOp(op, res);
     return success();
   }
@@ -111,11 +111,11 @@ struct ClampFOpConversion : public OpConversionPattern<triton::ClampFOp> {
     auto maxVal = rewriter.getRemappedValue(op.getMax());
     Value res;
     if (op.getPropagateNanAttr().getValue() == PropagateNan::ALL) {
-      res = rewriter.create<arith::MaximumFOp>(loc, val, minVal);
-      res = rewriter.create<arith::MinimumFOp>(loc, res, maxVal);
+      res = arith::MaximumFOp::create(rewriter, loc, val, minVal);
+      res = arith::MinimumFOp::create(rewriter, loc, res, maxVal);
     } else {
-      res = rewriter.create<arith::MaxNumFOp>(loc, val, minVal);
-      res = rewriter.create<arith::MinNumFOp>(loc, res, maxVal);
+      res = arith::MaxNumFOp::create(rewriter, loc, val, minVal);
+      res = arith::MinNumFOp::create(rewriter, loc, res, maxVal);
     }
     rewriter.replaceOp(op, res);
     return success();

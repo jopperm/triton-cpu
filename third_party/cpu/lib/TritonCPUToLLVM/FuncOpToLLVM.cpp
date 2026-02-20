@@ -95,8 +95,9 @@ struct FuncOpConversion : public ConvertOpToLLVMPattern<triton::FuncOp> {
                                 rewriter.getArrayAttr(amendedArgAttrs)));
     }
     // 3. Add a new arguments to the region
-    auto amendedFuncOp = rewriter.create<triton::FuncOp>(
-        funcOp.getLoc(), funcOp.getName(), amendedFuncTy, amendedAttrs);
+    auto amendedFuncOp =
+        triton::FuncOp::create(rewriter, funcOp.getLoc(), funcOp.getName(),
+                               amendedFuncTy, amendedAttrs);
     auto &region = funcOp.getBody();
     region.addArgument(i32_ty, loc);
     region.addArgument(i32_ty, loc);
@@ -140,21 +141,21 @@ struct ReturnOpConversion : public ConvertOpToLLVMPattern<triton::ReturnOp> {
     if (adaptor.getOperands().size() < 2) {
       // Single or no return value.
       newOp =
-          rewriter.create<LLVM::ReturnOp>(op.getLoc(), adaptor.getOperands());
+          LLVM::ReturnOp::create(rewriter, op.getLoc(), adaptor.getOperands());
     } else {
       // Pack the results into a struct.
       auto funcOp = op->getParentOfType<LLVM::LLVMFuncOp>();
       auto packedResultsTy = this->getTypeConverter()->packFunctionResults(
           funcOp.getResultTypes());
       Value packedResults =
-          rewriter.create<LLVM::UndefOp>(op.getLoc(), packedResultsTy);
+          LLVM::UndefOp::create(rewriter, op.getLoc(), packedResultsTy);
       auto loc = op.getLoc();
       auto b = TritonLLVMOpBuilder(loc, rewriter);
       for (auto it : llvm::enumerate(adaptor.getOperands())) {
         packedResults = b.insert_val(packedResultsTy, packedResults, it.value(),
                                      it.index());
       }
-      newOp = rewriter.create<LLVM::ReturnOp>(op.getLoc(), packedResults);
+      newOp = LLVM::ReturnOp::create(rewriter, op.getLoc(), packedResults);
     }
     newOp->setAttrs(op->getAttrs());
     rewriter.replaceOp(op, newOp->getResults());
@@ -209,9 +210,10 @@ private:
                 this->getTypeConverter()->packFunctionResults(resultTypes)))
         return nullptr;
     }
-    auto newCallOp = rewriter.create<LLVM::CallOp>(
-        callOp.getLoc(), packedResult ? TypeRange(packedResult) : TypeRange(),
-        promotedOperands, callOp->getAttrs());
+    auto newCallOp = LLVM::CallOp::create(rewriter, callOp.getLoc(),
+                                          packedResult ? TypeRange(packedResult)
+                                                       : TypeRange(),
+                                          promotedOperands, callOp->getAttrs());
     newCallOp.getProperties().setOpBundleSizes(
         rewriter.getDenseI32ArrayAttr({}));
     newCallOp.getProperties().setOperandSegmentSizes(
@@ -232,8 +234,8 @@ private:
       // Extract individual results from the structure and return them as list.
       results.reserve(numResults);
       for (unsigned i = 0; i < numResults; ++i) {
-        results.push_back(rewriter.create<LLVM::ExtractValueOp>(
-            callOp.getLoc(), newCallOp->getResult(0), i));
+        results.push_back(LLVM::ExtractValueOp::create(
+            rewriter, callOp.getLoc(), newCallOp->getResult(0), i));
       }
     }
     return results;

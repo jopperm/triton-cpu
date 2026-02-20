@@ -146,7 +146,7 @@ createTargetMachine(llvm::Module *module, std::string proc,
   if (!target) {
     // Try to get the default target triple.
     auto triple = getDefaultTargerOrProcessTriple();
-    target = llvm::TargetRegistry::lookupTarget(triple, error);
+    target = llvm::TargetRegistry::lookupTarget(Triple{triple}, error);
     if (!target) {
       throw std::runtime_error("target lookup error: " + error);
     }
@@ -792,7 +792,7 @@ void init_triton_llvm(py::module &&m) {
     mod->setTargetTriple(Triple(triple));
     std::string error;
     auto target =
-        llvm::TargetRegistry::lookupTarget(mod->getTargetTriple().str(), error);
+        llvm::TargetRegistry::lookupTarget(mod->getTargetTriple(), error);
     if (!target) {
       throw std::runtime_error("target lookup error: " + error);
     }
