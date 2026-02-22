@@ -607,7 +607,7 @@ def convert_to_tuple_if_list(item):
 
     return tuple(item)
 
-    
+
 def get_device_key():
     target = driver.active.get_current_target()
     device = driver.active.get_current_device()

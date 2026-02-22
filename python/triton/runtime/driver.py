@@ -4,8 +4,6 @@ import os
 
 from ..backends import backends, DriverBase
 
-import os
-
 
 def _create_driver() -> DriverBase:
     selected = os.environ.get("TRITON_DEFAULT_BACKEND", None)
