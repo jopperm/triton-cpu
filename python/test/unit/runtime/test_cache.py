@@ -902,7 +902,7 @@ def test_preload_higher_order_kernels(device, fresh_triton_cache) -> None:
 
 def test_module_load_unload(fresh_knobs):
     if is_cpu():
-        pytest.skip("Requires CUDA; unclear whether applicable to CPU backend")
+        pytest.xfail("Requires CUDA; unclear whether applicable to CPU backend")
 
     @triton.jit
     def kernel(out_ptr, val) -> None:

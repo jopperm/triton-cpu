@@ -1796,7 +1796,7 @@ def test_tensor_atomic_cas(sem, size, dtype_str, num_ctas, device):
     if is_hip_cdna2():
         pytest.skip("Disabled due to being flaky on CDNA2")
     if "float" in dtype_str and is_cpu():
-        pytest.skip("CPU does not support atomic cas with float types")
+        pytest.xfail("CPU does not support atomic cas with float types yet")
 
     @triton.jit
     def change_value(X, BLOCK_SIZE: tl.constexpr, sem: tl.constexpr, dtype: tl.constexpr):
@@ -3443,7 +3443,7 @@ def test_dot(M, N, K, num_warps, col_a, col_b, epilogue, input_precision, in_dty
             N = min(N, 32 if epilogue == "chain-dot" else 64)
             K = min(K, 16 if epilogue == "chain-dot" else 32)
         if input_precision == "bf16x3" or input_precision == "bf16x6":
-            pytest.skip(f"input_precision {input_precision} is not supported by the CPU backend")
+            pytest.xfail(f"input_precision {input_precision} is not supported by the CPU backend")
     else:
         if not is_hip() and K < 16:
             pytest.skip("small dots are supported only on HIP at the moment")
