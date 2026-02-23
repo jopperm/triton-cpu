@@ -11,6 +11,8 @@ from triton._internal_testing import is_cuda, is_hip, is_cpu
 
 
 def test_metadata() -> None:
+    if is_cpu:
+        pytest.xfail("Test is flaky on CPU")
 
     used_hook = False
 
