@@ -5,7 +5,7 @@ import triton.language as tl
 import pytest
 
 import pathlib
-from triton._internal_testing import is_cuda, is_hip_cdna2, is_rubin
+from triton._internal_testing import is_cuda, is_hip, is_hip_cdna2, is_rubin
 
 
 def do_bench(kernel_call, quantiles, use_cuda_graph=False):

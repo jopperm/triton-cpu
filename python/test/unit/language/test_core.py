@@ -472,6 +472,7 @@ def test_bin_op(dtype_x, dtype_y, op, num_ctas, device):
             test_broadcast=(op != "%"), x_low=x_low, x_high=x_high, filter_y=filter_y, test_scalar=not skip_scalar_test)
 
 
+@pytest.mark.cpu
 def test_bfloat16_mul_rounds_to_nearest_even(device):
     # A bf16 multiply has to round to nearest even. Hardware multiply-accumulate
     # instructions that write a bf16 result may truncate instead, which is off by
@@ -507,6 +508,7 @@ def test_bfloat16_mul_rounds_to_nearest_even(device):
     torch.testing.assert_close(z, z_ref, atol=0, rtol=0)
 
 
+@pytest.mark.cpu
 @pytest.mark.interpreter
 @pytest.mark.parametrize("op", ['+', '-'])
 def test_int1_bin_op_wraparound(op, device):
@@ -1147,6 +1149,7 @@ def test_math_member_fn(expr, device):
     _test_unary('float32', f'x.{expr}()', np_expr, device=device)
 
 
+@pytest.mark.cpu
 @pytest.mark.interpreter
 @pytest.mark.parametrize("expr", ['tl.exp(x)', 'x.exp()'])
 def test_math_member_fn_rejects_fp16(expr, device):
@@ -1162,6 +1165,7 @@ def test_math_member_fn_rejects_fp16(expr, device):
         kernel[(1, )](x)
 
 
+@pytest.mark.cpu
 @pytest.mark.interpreter
 @pytest.mark.parametrize("member_fn", [False, True])
 @pytest.mark.parametrize("dtype", [dtype for dtype in ["float32", "float64"]])
